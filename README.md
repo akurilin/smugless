@@ -33,9 +33,6 @@ SMUGLESS_URL=https://smugless.alex-d5b.workers.dev SMUGLESS_PASSWORD="$(cat .adm
 ```
 
 The generated admin password is in `.admin-password` (git-ignored). Signing in sets a 30-day session cookie signed with that password, so changing the secret signs everyone out. Scripts can skip the login page by sending the password via HTTP Basic auth (any username), as `scripts/seed.mjs` does.
-
-`npx wrangler dev` runs a local copy with a simulated bucket; put a test password in `.dev.vars` as `ADMIN_PASSWORD=...`.
-
 ## Limits and costs
 
 - Uploads go through the Worker, so 100 MB per file. Export JPEGs at full resolution; RAW/TIFF/HEIC aren't accepted.
