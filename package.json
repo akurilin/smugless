@@ -1,0 +1,22 @@
+{
+  "name": "smugless",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted photo portfolio on Cloudflare Workers + R2 + Images",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "hono": "^4.13.18"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261114.1",
+    "photoswipe": "^5.4.4",
+    "sortablejs": "^1.15.7",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.162.0"
+  }
+}

@@ -1,0 +1,618 @@
+import Sortable from "/vendor/sortable/sortable.esm.js";
+
+// ---------- State ----------
+
+let manifest = null;
+let current = null; // selected gallery object
+let selectedPhotoId = null;
+let saveTimer = null;
+let saving = Promise.resolve();
+
+const MAX_BYTES = 100 * 1024 * 1024; // Workers request body limit
+const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+const thumb = (id, w = 400) => `/img/${id}/${w}.webp`;
+
+// ---------- Tiny DOM helper ----------
+
+function h(tag, props = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else if (k === "value") el.value = v;
+    else if (k in el && typeof v !== "string") el[k] = v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of children.flat()) if (c != null && c !== false) el.append(c);
+  return el;
+}
+
+// ---------- Server calls ----------
+
+async function api(path, init) {
+  const res = await fetch(path, init);
+  if (res.status === 401) {
+    location.href = "/login";
+    throw new Error("Signed out");
+  }
+  return res;
+}
+
+// ---------- Saving ----------
+
+function setStatus(text, kind = "") {
+  const el = document.getElementById("status");
+  if (el) {
+    el.textContent = text;
+    el.className = `status ${kind}`;
+  }
+}
+
+function scheduleSave() {
+  setStatus("Unsaved changes…");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 600);
+}
+
+function saveNow() {
+  clearTimeout(saveTimer);
+  saving = saving.then(async () => {
+    setStatus("Saving…");
+    const res = await api("/api/manifest", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(manifest),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: res.statusText }));
+      setStatus(`Not saved: ${error}`, "error");
+      throw new Error(error);
+    }
+    setStatus("All changes saved", "ok");
+  });
+  // Keep the chain alive after a failure so later saves still run.
+  const result = saving;
+  saving = saving.catch(() => {});
+  return result;
+}
+
+window.addEventListener("beforeunload", (e) => {
+  if (document.getElementById("status")?.textContent.startsWith("Unsaved")) e.preventDefault();
+});
+
+// ---------- Helpers ----------
+
+function slugify(s) {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
+function uniqueSlug(base, except) {
+  base ||= "gallery";
+  let slug = base;
+  for (let i = 2; manifest.galleries.some((g) => g !== except && g.slug === slug); i++) slug = `${base}-${i}`;
+  return slug;
+}
+
+// Galleries created in this session whose URL still follows their title.
+const autoSlug = new WeakSet();
+
+// Two-click destructive button (no native confirm dialogs).
+function confirmButton(label, armedLabel, onConfirm) {
+  let timer = null;
+  const btn = h(
+    "button",
+    {
+      class: "btn danger",
+      onclick: () => {
+        if (!timer) {
+          btn.textContent = armedLabel;
+          btn.classList.add("armed");
+          timer = setTimeout(() => {
+            timer = null;
+            btn.textContent = label;
+            btn.classList.remove("armed");
+          }, 4000);
+          return;
+        }
+        clearTimeout(timer);
+        onConfirm();
+      },
+    },
+    label,
+  );
+  return btn;
+}
+
+function selectGallery(g) {
+  current = g;
+  selectedPhotoId = null;
+  history.replaceState(null, "", g ? `#${g.slug}` : "#");
+  render();
+}
+
+async function deletePhotos(ids) {
+  await saveNow(); // the server refuses to delete photos still in the saved manifest
+  for (const id of ids) {
+    const res = await api(`/api/photos/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 404) setStatus(`Could not delete a photo (${res.status})`, "error");
+  }
+}
+
+// ---------- Uploads ----------
+
+async function dimensions(file) {
+  const bmp = await createImageBitmap(file); // applies EXIF orientation
+  const dims = { w: bmp.width, h: bmp.height };
+  bmp.close();
+  return dims;
+}
+
+function uploadFile(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/photos");
+    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.setRequestHeader("X-Filename", encodeURIComponent(file.name));
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    xhr.onload = () => {
+      if (xhr.status === 200) resolve(JSON.parse(xhr.responseText));
+      else if (xhr.status === 401) location.href = "/login";
+      else reject(new Error(JSON.parse(xhr.responseText || "{}").error || `HTTP ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error("Network error"));
+    xhr.send(file);
+  });
+}
+
+async function uploadFiles(files, gallery) {
+  files = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const queue = document.getElementById("queue");
+  const jobs = files.map((file) => {
+    const bar = h("progress", { max: 1, value: 0 });
+    const msg = h("span", { class: "queue-msg" }, "waiting");
+    const row = h("li", {}, h("span", { class: "queue-name" }, file.name), bar, msg);
+    queue?.append(row);
+    return { file, row, bar, msg, done: false, photo: null };
+  });
+
+  // Append finished uploads to the gallery in the order they were dropped.
+  let head = 0;
+  const flush = () => {
+    let added = false;
+    while (head < jobs.length && jobs[head].done) {
+      if (jobs[head].photo) {
+        gallery.photos.push(jobs[head].photo);
+        added = true;
+      }
+      head++;
+    }
+    if (added) {
+      scheduleSave();
+      if (gallery === current) renderPhotos();
+      renderSidebar();
+    }
+  };
+
+  const run = async (job) => {
+    const { file } = job;
+    try {
+      if (!ACCEPTED.includes(file.type)) throw new Error("Use JPEG, PNG, WebP or AVIF");
+      if (file.size > MAX_BYTES) throw new Error("Larger than 100 MB");
+      job.msg.textContent = "reading";
+      const { w, h } = await dimensions(file);
+      job.msg.textContent = "uploading";
+      const { id } = await uploadFile(file, (p) => (job.bar.value = p));
+      job.photo = { id, w, h, filename: file.name };
+      job.bar.value = 1;
+      job.msg.textContent = "done";
+      setTimeout(() => job.row.remove(), 1500);
+    } catch (err) {
+      job.msg.textContent = err.message;
+      job.row.classList.add("failed");
+      setTimeout(() => job.row.remove(), 10000);
+    }
+    job.done = true;
+    flush();
+  };
+
+  // Three uploads at a time.
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(3, jobs.length) }, async () => {
+      while (next < jobs.length) await run(jobs[next++]);
+    }),
+  );
+}
+
+// ---------- Rendering ----------
+
+function render() {
+  const app = document.getElementById("app");
+  app.replaceChildren(
+    h(
+      "header",
+      { class: "topbar" },
+      h("strong", {}, "Smugless"),
+      h("span", { id: "status", class: "status ok" }, "All changes saved"),
+      h("a", { href: current ? `/${current.slug}` : "/", target: "_blank", class: "view-link" }, "View site ↗"),
+      h("form", { method: "post", action: "/logout" }, h("button", { class: "link-btn" }, "Log out")),
+    ),
+    h("aside", { class: "sidebar", id: "sidebar" }),
+    h("main", { class: "content", id: "content" }),
+  );
+  renderSidebar();
+  renderContent();
+}
+
+function renderSidebar() {
+  const side = document.getElementById("sidebar");
+  if (!side) return;
+
+  const list = h(
+    "ul",
+    { class: "gallery-list" },
+    manifest.galleries.map((g) =>
+      h(
+        "li",
+        { class: g === current ? "active" : "", "data-slug": g.slug },
+        h("span", { class: "drag" }, "⋮⋮"),
+        h(
+          "button",
+          { class: "gallery-btn", onclick: () => selectGallery(g) },
+          h("span", { class: "gallery-name" }, g.title),
+          h("span", { class: "count" }, String(g.photos.length)),
+        ),
+      ),
+    ),
+  );
+
+  Sortable.create(list, {
+    handle: ".drag",
+    animation: 150,
+    onEnd: (e) => {
+      const [moved] = manifest.galleries.splice(e.oldIndex, 1);
+      manifest.galleries.splice(e.newIndex, 0, moved);
+      scheduleSave();
+    },
+  });
+
+  side.replaceChildren(
+    h(
+      "section",
+      { class: "site-settings" },
+      h("h2", {}, "Site"),
+      h(
+        "label",
+        {},
+        "Title",
+        h("input", {
+          value: manifest.site.title,
+          oninput: (e) => {
+            manifest.site.title = e.target.value;
+            scheduleSave();
+          },
+        }),
+      ),
+      h(
+        "label",
+        {},
+        "Tagline",
+        h("textarea", {
+          rows: 2,
+          value: manifest.site.tagline ?? "",
+          oninput: (e) => {
+            manifest.site.tagline = e.target.value;
+            scheduleSave();
+          },
+        }),
+      ),
+    ),
+    h("h2", {}, "Galleries"),
+    list,
+    h(
+      "button",
+      {
+        class: "btn primary",
+        onclick: () => {
+          const g = { slug: uniqueSlug("untitled"), title: "Untitled", photos: [] };
+          autoSlug.add(g);
+          manifest.galleries.push(g);
+          scheduleSave();
+          selectGallery(g);
+          document.querySelector(".gallery-form input")?.select();
+        },
+      },
+      "+ New gallery",
+    ),
+  );
+}
+
+function renderContent() {
+  const content = document.getElementById("content");
+  if (!current) {
+    content.replaceChildren(
+      h(
+        "div",
+        { class: "empty-state" },
+        manifest.galleries.length ? "Pick a gallery on the left." : "Create your first gallery to get started.",
+      ),
+    );
+    return;
+  }
+  const g = current;
+
+  const slugError = h("span", { class: "field-error" });
+  const setSlug = (v) => {
+    g.slug = v;
+    history.replaceState(null, "", `#${v}`);
+    document.querySelector(".view-link").href = `/${v}`;
+    slugError.textContent = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(v) ? "" : "Lowercase letters, numbers and dashes";
+  };
+  const slugInput = h("input", {
+    value: g.slug,
+    oninput: (e) => {
+      const v = e.target.value.toLowerCase();
+      e.target.value = v;
+      autoSlug.delete(g);
+      setSlug(v);
+      scheduleSave();
+    },
+  });
+  const form = h(
+    "section",
+    { class: "gallery-form" },
+    h(
+      "div",
+      { class: "row" },
+      h(
+        "label",
+        { class: "grow" },
+        "Title",
+        h("input", {
+          value: g.title,
+          oninput: (e) => {
+            g.title = e.target.value;
+            const btn = document.querySelector(`.gallery-list li.active .gallery-name`);
+            if (btn) btn.textContent = g.title;
+            if (autoSlug.has(g)) {
+              setSlug(uniqueSlug(slugify(g.title) || "untitled", g));
+              slugInput.value = g.slug;
+            }
+            scheduleSave();
+          },
+        }),
+      ),
+      h("label", {}, "URL", h("span", { class: "slug-input" }, "/", slugInput)),
+    ),
+    slugError,
+    h(
+      "label",
+      {},
+      "Description",
+      h("textarea", {
+        rows: 3,
+        value: g.description ?? "",
+        oninput: (e) => {
+          g.description = e.target.value;
+          scheduleSave();
+        },
+      }),
+    ),
+    h(
+      "div",
+      { class: "row end" },
+      confirmButton(
+        "Delete gallery",
+        g.photos.length
+          ? `Delete it and its ${g.photos.length} photo${g.photos.length === 1 ? "" : "s"}? Click again`
+          : "Click again to delete",
+        async () => {
+          const ids = g.photos.map((p) => p.id);
+          manifest.galleries = manifest.galleries.filter((x) => x !== g);
+          selectGallery(manifest.galleries[0] ?? null);
+          await deletePhotos(ids);
+        },
+      ),
+    ),
+  );
+
+  const fileInput = h("input", {
+    type: "file",
+    multiple: true,
+    accept: ACCEPTED.join(","),
+    hidden: true,
+    onchange: (e) => {
+      uploadFiles(e.target.files, g);
+      e.target.value = "";
+    },
+  });
+  const drop = h(
+    "div",
+    {
+      class: "dropzone",
+      onclick: () => fileInput.click(),
+      ondragover: (e) => {
+        e.preventDefault();
+        drop.classList.add("over");
+      },
+      ondragleave: () => drop.classList.remove("over"),
+      ondrop: (e) => {
+        e.preventDefault();
+        drop.classList.remove("over");
+        uploadFiles(e.dataTransfer.files, g);
+      },
+    },
+    h("strong", {}, "Drop photos here"),
+    h("span", {}, "or click to choose · JPEG, PNG, WebP, AVIF up to 100 MB"),
+    fileInput,
+  );
+
+  content.replaceChildren(
+    form,
+    drop,
+    h("ul", { class: "queue", id: "queue" }),
+    h("div", { class: "photos-layout" }, h("div", { id: "photos" }), h("aside", { id: "photo-panel" })),
+  );
+  renderPhotos();
+}
+
+function renderPhotos() {
+  const wrap = document.getElementById("photos");
+  if (!wrap || !current) return;
+  const g = current;
+
+  if (!g.photos.length) {
+    wrap.replaceChildren(h("p", { class: "muted" }, "No photos yet."));
+    renderPanel();
+    return;
+  }
+
+  const grid = h(
+    "ul",
+    { class: "photo-grid" },
+    g.photos.map((p) =>
+      h(
+        "li",
+        {
+          class: [p.id === selectedPhotoId && "selected", p.id === (g.cover ?? g.photos[0]?.id) && "cover"]
+            .filter(Boolean)
+            .join(" "),
+          "data-id": p.id,
+          onclick: () => {
+            selectedPhotoId = p.id;
+            grid.querySelectorAll("li").forEach((li) => li.classList.toggle("selected", li.dataset.id === p.id));
+            renderPanel();
+          },
+        },
+        h("img", { src: thumb(p.id), alt: p.filename, loading: "lazy", draggable: "false" }),
+        p.caption ? h("span", { class: "cap" }, p.caption) : null,
+      ),
+    ),
+  );
+
+  Sortable.create(grid, {
+    animation: 150,
+    onEnd: (e) => {
+      const [moved] = g.photos.splice(e.oldIndex, 1);
+      g.photos.splice(e.newIndex, 0, moved);
+      scheduleSave();
+      if (!g.cover) renderPhotos(); // first photo is the implicit cover
+    },
+  });
+
+  wrap.replaceChildren(
+    h(
+      "p",
+      { class: "muted hint" },
+      `${g.photos.length} photo${g.photos.length === 1 ? "" : "s"} · drag to reorder · click to edit`,
+    ),
+    grid,
+  );
+  renderPanel();
+}
+
+function renderPanel() {
+  const panel = document.getElementById("photo-panel");
+  if (!panel) return;
+  const g = current;
+  const p = g?.photos.find((x) => x.id === selectedPhotoId);
+  if (!p) {
+    panel.replaceChildren();
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+  const isCover = (g.cover ?? g.photos[0]?.id) === p.id;
+  const others = manifest.galleries.filter((x) => x !== g);
+
+  panel.replaceChildren(
+    h("img", { src: thumb(p.id, 800), alt: p.filename }),
+    h("p", { class: "meta" }, p.filename, h("br"), `${p.w} × ${p.h}`),
+    h(
+      "label",
+      {},
+      "Caption",
+      h("textarea", {
+        rows: 3,
+        value: p.caption ?? "",
+        oninput: (e) => {
+          p.caption = e.target.value;
+          const li = document.querySelector(`.photo-grid li[data-id="${p.id}"]`);
+          let cap = li?.querySelector(".cap");
+          if (li && !cap) li.append((cap = h("span", { class: "cap" })));
+          if (cap) cap.textContent = p.caption;
+          scheduleSave();
+        },
+      }),
+    ),
+    h(
+      "button",
+      {
+        class: "btn",
+        disabled: isCover,
+        onclick: () => {
+          g.cover = p.id;
+          scheduleSave();
+          renderPhotos();
+        },
+      },
+      isCover ? "Gallery cover" : "Use as gallery cover",
+    ),
+    others.length
+      ? h(
+          "label",
+          {},
+          "Move to",
+          h(
+            "select",
+            {
+              onchange: (e) => {
+                const target = others.find((x) => x.slug === e.target.value);
+                if (!target) return;
+                g.photos = g.photos.filter((x) => x !== p);
+                if (g.cover === p.id) delete g.cover;
+                target.photos.push(p);
+                selectedPhotoId = null;
+                scheduleSave();
+                renderSidebar();
+                renderPhotos();
+              },
+            },
+            h("option", { value: "" }, "Choose a gallery…"),
+            others.map((x) => h("option", { value: x.slug }, x.title)),
+          ),
+        )
+      : null,
+    confirmButton("Delete photo", "Click again to delete", async () => {
+      g.photos = g.photos.filter((x) => x !== p);
+      if (g.cover === p.id) delete g.cover;
+      selectedPhotoId = null;
+      renderSidebar();
+      renderPhotos();
+      await deletePhotos([p.id]);
+    }),
+  );
+}
+
+// ---------- Boot ----------
+
+async function boot() {
+  const res = await api("/api/manifest");
+  if (!res.ok) {
+    document.getElementById("app").textContent = `Could not load: HTTP ${res.status}`;
+    return;
+  }
+  manifest = await res.json();
+  const slug = decodeURIComponent(location.hash.slice(1));
+  current = manifest.galleries.find((g) => g.slug === slug) ?? manifest.galleries[0] ?? null;
+  render();
+}
+
+boot();

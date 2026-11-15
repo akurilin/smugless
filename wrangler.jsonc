@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "smugless",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  // Static files (CSS, JS, vendored libraries). Anything not matching a file falls through to the Worker.
+  "assets": { "directory": "./public" },
+  // Private bucket: originals/, derived/ (resized cache), trash/, manifest.json
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "smugless-photos" }],
+  // Cloudflare Images binding, used to resize originals on first request
+  "images": { "binding": "IMAGES" },
+  "observability": { "enabled": true }
+  // Secret (set with `wrangler secret put ADMIN_PASSWORD`): password for /admin
+}
