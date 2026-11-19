@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Open-source photo portfolio website with a built-in admin, on Cloudflare Workers, R2 and Images",
+  "description": "Open-source photo portfolio website with a built-in admin, nearly free to host on Cloudflare Workers, R2 and Images",
   "scripts": {
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",

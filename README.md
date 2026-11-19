@@ -1,6 +1,8 @@
 # smugless
 
-An open-source photo portfolio website with a built-in admin for managing your galleries. It runs on your own Cloudflare account: one Worker, one private R2 bucket, and Cloudflare Images for resizing. There's no build step and no database, and it fits in the free tiers for a typical portfolio.
+An open-source photo portfolio website with a built-in admin for managing your galleries, built to be extremely cheap to host. Hosted portfolio services charge a monthly subscription; smugless runs on your own Cloudflare account and, for a typical portfolio, fits entirely in Cloudflare's free tiers, so you pay nothing beyond a domain name (and even that's optional).
+
+Under the hood it's one Worker, one private R2 bucket, and Cloudflare Images for resizing. No servers to run, no database, no build step.
 
 **Live demo:** https://smugless.kuril.in (photos from Unsplash; the photographer is fictional)
 
@@ -80,10 +82,26 @@ npm run deploy:demo-proxy
 
 `smugless.kuril.in` is served by a tiny Cloudflare Pages project, `smugless-demo-proxy` (`demo-proxy/`), whose `_worker.js` hands every request to `smugless-demo` through a service binding. kuril.in's DNS isn't on Cloudflare, and a Worker can only take a custom domain on a Cloudflare zone, but Pages accepts a subdomain by CNAME from any DNS host: kuril.in has `CNAME smugless → smugless-demo-proxy.pages.dev`. The project is classic Pages, created with `wrangler pages project create --force`; without `--force`, current wrangler turns it into a Worker, which needs a zone again.
 
-## Limits and costs
+## What it costs
+
+smugless is designed around Cloudflare's free tiers:
+
+| Service | Free tier | What smugless uses it for |
+|---|---|---|
+| Workers | 100,000 requests/day | Every page view and image request |
+| R2 | 10 GB storage, no egress fees | Your originals plus their resized copies |
+| Images | 5,000 unique transformations/month | Resizing each photo, once |
+
+Why it stays inside them:
+- **Each photo is resized once.** Resized copies are saved back to R2 and served from there forever after, and every photo uses at most 15 sizes (5 widths × 3 formats). 100 photos cost at most ~1,500 transformations, one time.
+- **No egress fees.** R2 doesn't charge for bandwidth, so a popular gallery doesn't run up a bill.
+- **No always-on server.** The Worker runs only when someone visits.
+
+A portfolio of several hundred full-resolution photos fits comfortably in 10 GB. If you outgrow the free tiers, R2 storage is about $0.015 per GB per month and the Workers paid plan is $5/month; see Cloudflare's current [Workers](https://developers.cloudflare.com/workers/platform/pricing/), [R2](https://developers.cloudflare.com/r2/pricing/) and [Images](https://developers.cloudflare.com/images/pricing/) pricing. Uploading a very large batch in one month can pass the 5,000-transformation allowance; since resized copies are kept, that's a one-time cost.
+
+## Limits
 
 - Uploads go through the Worker, so 100 MB per file. Export JPEGs at full resolution; RAW/TIFF/HEIC aren't accepted.
-- Free tiers: Workers 100k requests/day, R2 10 GB storage with free egress, Images 5,000 unique transformations/month. 100 photos use at most ~1,500 transformations, once.
 
 ## Not done yet
 
