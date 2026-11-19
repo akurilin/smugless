@@ -27,7 +27,8 @@ export interface About {
 
 export interface Manifest {
   // home: slug of a gallery to show at / instead of the grid of all galleries
-  site: { title: string; tagline?: string; home?: string };
+  // icon: uploaded favicon (not part of any gallery); without it a letter icon is generated
+  site: { title: string; tagline?: string; home?: string; icon?: Photo };
   galleries: Gallery[]; // navigation order
   about?: About;
 }
@@ -59,6 +60,7 @@ export async function saveManifest(bucket: R2Bucket, m: Manifest): Promise<void>
 
 export function findPhoto(m: Manifest, id: string): Photo | undefined {
   if (m.about?.photo?.id === id) return m.about.photo;
+  if (m.site.icon?.id === id) return m.site.icon;
   for (const g of m.galleries) {
     const p = g.photos.find((p) => p.id === id);
     if (p) return p;
@@ -102,6 +104,13 @@ export function validateManifest(input: unknown): Manifest | string {
     });
   }
 
+  let icon: Photo | undefined;
+  if (site.icon != null) {
+    const p = cleanPhoto(site.icon, ids);
+    if (typeof p === "string") return p;
+    icon = p;
+  }
+
   let about: About | undefined;
   if (obj.about != null) {
     const a = obj.about;
@@ -128,6 +137,7 @@ export function validateManifest(input: unknown): Manifest | string {
       ...(typeof site.tagline === "string" && site.tagline.trim() ? { tagline: site.tagline } : {}),
       // Dropped if it no longer names a gallery (renamed or deleted), like a stale cover.
       ...(typeof site.home === "string" && slugs.has(site.home) ? { home: site.home } : {}),
+      ...(icon ? { icon } : {}),
     },
     galleries,
     ...(about ? { about } : {}),

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { checkPassword, endSession, requireAdmin, startSession } from "./auth";
+import { defaultIconResponse, uploadedIconResponse } from "./icon";
 import { serveImage, WIDTHS, type Format } from "./images";
 import { findPhoto, loadManifest, PHOTO_ID, saveManifest, validateManifest, type Env } from "./manifest";
 import { aboutPage, adminPage, galleryPage, homePage, loginPage, notFoundPage } from "./views";
@@ -18,6 +19,24 @@ app.get("/img/:id/:file", async (c) => {
   const width = Number(m[1]);
   if (!(WIDTHS as readonly number[]).includes(width)) return c.notFound();
   return serveImage(c.env, c.executionCtx, id, width, m[2] as Format);
+});
+
+// ---------- Site icon ----------
+// Linked from every page with ?v=<version>; /favicon.ico is for clients that just guess.
+
+app.get("/favicon.svg", async (c) => defaultIconResponse(await loadManifest(c.env.BUCKET), !!c.req.query("v")));
+
+app.get("/icon.png", async (c) => {
+  const m = await loadManifest(c.env.BUCKET);
+  if (!m.site.icon) return c.notFound();
+  return uploadedIconResponse(c.env, c.executionCtx, m.site.icon.id, !!c.req.query("v"));
+});
+
+app.get("/favicon.ico", async (c) => {
+  const m = await loadManifest(c.env.BUCKET);
+  return m.site.icon
+    ? uploadedIconResponse(c.env, c.executionCtx, m.site.icon.id, false)
+    : defaultIconResponse(m, false);
 });
 
 // ---------- Admin ----------

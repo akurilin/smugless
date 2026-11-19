@@ -320,6 +320,7 @@ function renderSidebar() {
         }),
       ),
       homePicker(),
+      iconPicker(),
     ),
     h("h2", {}, "Galleries"),
     list,
@@ -382,6 +383,78 @@ function homePicker() {
       h("option", { value: "" }, "All galleries (grid)"),
       manifest.galleries.map((g) => h("option", { value: g.slug, selected: manifest.site.home === g.slug }, g.title)),
     ),
+  );
+}
+
+// Favicon: an uploaded square image, or a generated letter icon when there's none.
+function iconPicker() {
+  const icon = manifest.site.icon;
+  const msg = h("span", { class: "muted" });
+  const preview = icon
+    ? `/icon.png?v=${icon.id}`
+    : `/favicon.svg?v=${encodeURIComponent(manifest.site.title.trim().charAt(0))}`;
+
+  async function setIcon(file) {
+    try {
+      if (!ACCEPTED.includes(file.type)) throw new Error("Use PNG, JPEG, WebP or AVIF");
+      if (file.size > MAX_BYTES) throw new Error("Larger than 100 MB");
+      msg.textContent = "Uploading…";
+      const { w, h: height } = await dimensions(file);
+      const { id } = await uploadFile(file, (p) => (msg.textContent = `Uploading… ${Math.round(p * 100)}%`));
+      const old = manifest.site.icon;
+      manifest.site.icon = { id, w, h: height, filename: file.name };
+      renderSidebar();
+      if (old) await deletePhotos([old.id]);
+      else await saveNow();
+    } catch (err) {
+      msg.textContent = err.message;
+    }
+  }
+
+  const fileInput = h("input", {
+    type: "file",
+    accept: ACCEPTED.join(","),
+    hidden: true,
+    onchange: (e) => {
+      if (e.target.files[0]) setIcon(e.target.files[0]);
+      e.target.value = "";
+    },
+  });
+  const drop = h(
+    "div",
+    {
+      class: "dropzone icon-drop",
+      onclick: () => fileInput.click(),
+      ondragover: (e) => {
+        e.preventDefault();
+        drop.classList.add("over");
+      },
+      ondragleave: () => drop.classList.remove("over"),
+      ondrop: (e) => {
+        e.preventDefault();
+        drop.classList.remove("over");
+        if (e.dataTransfer.files[0]) setIcon(e.dataTransfer.files[0]);
+      },
+    },
+    h("img", { src: preview, alt: "", width: 32, height: 32 }),
+    h("span", {}, icon ? "Drop or click to replace" : "Default letter icon · drop a square image to replace"),
+    fileInput,
+  );
+
+  return h(
+    "div",
+    { class: "icon-field" },
+    h("span", { class: "label" }, "Site icon"),
+    drop,
+    msg,
+    icon
+      ? confirmButton("Use default icon", "Click again to remove", async () => {
+          const id = icon.id;
+          delete manifest.site.icon;
+          renderSidebar();
+          await deletePhotos([id]);
+        })
+      : null,
   );
 }
 

@@ -31,11 +31,12 @@ Under the hood it's one Worker, one private R2 bucket, and Cloudflare Images for
 - An optional About page with a portrait, a bio and a contact email.
 - Responsive images in AVIF and WebP at five widths, generated on first request and cached. Resized copies carry no EXIF data, GPS included.
 - Light and dark themes that follow the visitor's system setting.
+- A site icon (favicon): a letter icon generated from your site title until you upload your own.
 
 **Admin** (`/admin`, password-protected)
 - Create, rename, reorder and delete galleries.
 - Drag and drop photos to upload (JPEG, PNG, WebP, AVIF up to 100 MB), drag to reorder, add captions, pick a cover, move photos between galleries.
-- Edit the site title, tagline, home page and About page.
+- Edit the site title, tagline, home page, site icon and About page.
 - Every change saves automatically and is live immediately.
 
 ## Deploy your own
@@ -76,7 +77,7 @@ R2 bucket smugless-photos (private)
 - The admin page holds the manifest in memory and PUTs the whole thing back. The server validates it (unique, non-reserved URLs; every photo used once).
 - Signing in sets a 30-day session cookie signed with the admin password, so changing the password signs everyone out. Scripts can skip the login page by sending the password via HTTP Basic auth (any username), as `scripts/seed.mjs` does.
 
-Code: `src/index.ts` (routes), `src/images.ts`, `src/manifest.ts`, `src/views.ts`, `src/auth.ts`; browser code in `public/static/`.
+Code: `src/index.ts` (routes), `src/images.ts`, `src/icon.ts`, `src/manifest.ts`, `src/views.ts`, `src/auth.ts`; browser code in `public/static/`.
 
 ## Commands
 

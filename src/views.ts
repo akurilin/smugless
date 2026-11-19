@@ -1,6 +1,7 @@
 import { html } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { About, Gallery, Manifest, Photo } from "./manifest";
+import { iconLinks } from "./icon";
 import { displaySize, imageUrl, srcset } from "./images";
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -12,6 +13,12 @@ function coverOf(g: Gallery): Photo | undefined {
 function paragraphs(text?: string): Html | string {
   if (!text) return "";
   return html`${text.split(/\n\s*\n/).map((para) => html`<p>${para}</p>`)}`;
+}
+
+function iconHead(m: Manifest): Html {
+  const icon = iconLinks(m);
+  return html`<link rel="icon" href="${icon.href}" type="${icon.type}">${icon.touch ? html`
+<link rel="apple-touch-icon" href="${icon.href}">` : ""}`;
 }
 
 function layout(
@@ -27,6 +34,7 @@ function layout(
 ${opts.description ? html`<meta name="description" content="${opts.description}">` : ""}
 <meta property="og:title" content="${opts.title}">
 ${opts.ogImage ? html`<meta property="og:image" content="${opts.ogImage}">` : ""}
+${iconHead(m)}
 <link rel="stylesheet" href="/static/site.css">
 </head>
 <body>

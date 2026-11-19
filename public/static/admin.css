@@ -251,3 +251,15 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .about-form h3 { margin: 18px 0 6px; font-size: 14px; }
 .portrait-drop { max-width: 320px; }
 .portrait-drop img { display: block; width: 100%; height: auto; margin-bottom: 8px; border-radius: 4px; }
+
+/* Site icon field */
+.icon-field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.icon-drop {
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+}
+.icon-drop img { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
+.icon-field .btn { justify-self: start; }
