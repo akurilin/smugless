@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Seeds the site with free Unsplash photos (Unsplash license), uploading them
-// through the same admin API the upload page uses. Skips galleries whose URL
-// already exists, so it's safe to re-run.
+// through the same admin API the upload page uses. Safe to re-run: it only adds
+// what's missing (new galleries, and new photos in existing ones).
 //
 //   SMUGLESS_URL=https://smugless.<you>.workers.dev SMUGLESS_PASSWORD=... node scripts/seed.mjs
 
@@ -23,7 +23,10 @@ const GALLERIES = [
       "1530870110042-98b2cb110834", "1787894653068-bf1eeb927af4", "1526342122811-2a9c8512023d",
       "1559627755-42212e5c5fdf", "1535182463927-440364075d9c", "1771197265637-3ed8f0039e20",
       "1609870025624-98b62826e80a", "1527731149372-fae504a1185f", "1513569143478-b38b2c0ef97f",
-      "1517699418036-fb5d179fef0c", "1493225255756-d9584f8606e9",
+      "1517699418036-fb5d179fef0c", "1493225255756-d9584f8606e9", "1498330177096-689e3fb901ca",
+      "1601505804121-45e2c5506c94", "1459745930869-b3d0d72c3cbb", "1476574898132-040f50db0a01",
+      "1509914398892-963f53e6e2f1", "1523606772308-64a28db0ef2c", "1688263638788-fa120d93bbc3",
+      "1526342256246-b67e94be5c79",
     ],
   },
   {
@@ -146,16 +149,30 @@ if (["Portfolio", "Smugless"].includes(manifest.site.title)) {
   manifest.site.home = SITE.home; // land on a gallery rather than the grid (first gallery, so it exists by the first save)
 }
 
+/** Uploads three at a time, keeping the given order. */
+async function uploadAll(ids) {
+  const photos = [];
+  for (let i = 0; i < ids.length; i += 3) photos.push(...(await Promise.all(ids.slice(i, i + 3).map(upload))));
+  return photos;
+}
+
 for (const def of GALLERIES) {
-  if (manifest.galleries.some((g) => g.slug === def.slug)) {
-    console.log(`Skipping ${def.slug}: already exists`);
+  const existing = manifest.galleries.find((g) => g.slug === def.slug);
+  if (existing) {
+    // Photos are matched by the filename this script gives them.
+    const have = new Set(existing.photos.map((p) => p.filename));
+    const missing = def.photos.filter((id) => !have.has(`unsplash-${id}.jpg`));
+    if (!missing.length) {
+      console.log(`Skipping ${def.slug}: up to date`);
+      continue;
+    }
+    console.log(`Gallery ${def.title}: adding ${missing.length} photos`);
+    existing.photos.push(...(await uploadAll(missing)));
+    await save();
     continue;
   }
   console.log(`Gallery ${def.title}`);
-  const photos = [];
-  for (let i = 0; i < def.photos.length; i += 3) {
-    photos.push(...(await Promise.all(def.photos.slice(i, i + 3).map(upload))));
-  }
+  const photos = await uploadAll(def.photos);
   photos[0].caption = "Photo via Unsplash";
   manifest.galleries.push({ slug: def.slug, title: def.title, description: def.description, photos });
   // Save after each gallery so a failure part-way keeps what's done.
