@@ -7,7 +7,10 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "deploy:demo": "wrangler deploy --env demo",
+    "tail:demo": "wrangler tail --env demo",
+    "deploy:demo-proxy": "cd demo-proxy && wrangler pages deploy --branch main"
   },
   "dependencies": {
     "hono": "^4.13.18"

@@ -46,7 +46,54 @@ const GALLERIES = [
       "1513635269975-59663e0ac1ad", "1516483638261-f4dbaf036963",
     ],
   },
+  {
+    slug: "macro",
+    title: "Macro",
+    description: "Beetles, bees and the very small.",
+    photos: [
+      "1630971027932-85249b204a37", "1688076672050-8b9be2f56c0a", "1791297969061-dde5d7ed6fc4",
+      "1771090354970-bcc9c4fa3725", "1757540980175-5e7206eb52fa", "1620837292558-bef9592b4dae",
+      "1765986575585-1f61d27e51cb", "1790360484612-da016da03a03", "1786656793456-a2a81feadc9c",
+    ],
+  },
+  {
+    slug: "portraits",
+    title: "Portraits",
+    description: "People I met along the way, mostly in natural light.",
+    photos: [
+      "1544005313-94ddf0286df2", "1616235931343-10a92ecaeaf2", "1506863530036-1efeddceb993",
+      "1558507652-2d9626c4e67a", "1674492396060-7ca95cf3e57a", "1586425225143-0c8f59053610",
+      "1635713150362-ed0cd425e697", "1629794138560-46d2815a6d79", "1623739770355-0677ee41f560",
+      "1498551172505-8ee7ad69f235",
+    ],
+  },
+  {
+    slug: "surfing",
+    title: "Surfing",
+    description: "Early mornings in the water.",
+    photos: [
+      "1530870110042-98b2cb110834", "1787894653068-bf1eeb927af4", "1526342122811-2a9c8512023d",
+      "1559627755-42212e5c5fdf", "1535182463927-440364075d9c", "1771197265637-3ed8f0039e20",
+      "1609870025624-98b62826e80a", "1527731149372-fae504a1185f", "1513569143478-b38b2c0ef97f",
+      "1517699418036-fb5d179fef0c", "1493225255756-d9584f8606e9",
+    ],
+  },
 ];
+
+// A made-up photographer for the demo's About page. The portrait hides the face
+// behind a camera, so no real, recognizable person stands in for a fictional one.
+const SITE = { title: "Elena Marsh", tagline: "Landscapes, oceans and small things, from the Northern California coast." };
+const ABOUT = {
+  title: "About",
+  portrait: "1549981832-2ba2ee913334",
+  email: "hello@elenamarsh.example",
+  text: [
+    "I photograph the places where the land runs out: coastlines, ridgelines, the edges of cities at first light. Most of my work starts with a long drive and an early alarm, and ends with whatever the weather decides to give me.",
+    "I grew up in Santa Cruz with a surfboard long before a camera, and the ocean is still where I spend most mornings. Over the last decade I've shot for travel and outdoor brands, followed surf contests up and down the Pacific coast, and made portraits of the people I meet along the way. The macro work started as a rainy-day project and never stopped.",
+    "I'm available for editorial and commercial commissions, and prints of everything here are available on request.",
+    "This is a demo of Smugless: Elena is fictional, and every photo on this site comes from Unsplash.",
+  ].join("\n\n"),
+};
 
 async function api(path, init = {}) {
   const res = await fetch(BASE + path, { ...init, headers: { ...auth, ...init.headers } });
@@ -85,8 +132,18 @@ async function upload(unsplashId) {
 }
 
 const manifest = await api("/api/manifest");
-if (manifest.site.title === "Portfolio") manifest.site.title = "Smugless";
-manifest.site.tagline ??= "Photographs, hosted for the price of a domain.";
+const save = () =>
+  api("/api/manifest", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(manifest),
+  });
+
+// Only replace the defaults (or this script's earlier "Smugless" title), never a title you set.
+if (["Portfolio", "Smugless"].includes(manifest.site.title)) {
+  manifest.site.title = SITE.title;
+  manifest.site.tagline = SITE.tagline;
+}
 
 for (const def of GALLERIES) {
   if (manifest.galleries.some((g) => g.slug === def.slug)) {
@@ -101,11 +158,18 @@ for (const def of GALLERIES) {
   photos[0].caption = "Photo via Unsplash";
   manifest.galleries.push({ slug: def.slug, title: def.title, description: def.description, photos });
   // Save after each gallery so a failure part-way keeps what's done.
-  await api("/api/manifest", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(manifest),
-  });
+  await save();
 }
+
+if (manifest.about) {
+  console.log("Skipping About page: already exists");
+} else {
+  console.log("About page");
+  const { portrait, ...about } = ABOUT;
+  const photo = await upload(portrait);
+  photo.caption = `${SITE.title}, behind the camera`;
+  manifest.about = { ...about, photo };
+}
+await save();
 
 console.log(`Done. Open ${BASE}/`);

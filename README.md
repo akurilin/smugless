@@ -2,16 +2,18 @@
 
 A small self-hosted photo portfolio: one Cloudflare Worker, one private R2 bucket, Cloudflare Images for resizing.
 
-- **Public site**: `/` lists galleries, `/<slug>` shows a gallery as a justified grid with a PhotoSwipe lightbox (swipe, pinch-zoom).
-- **Admin**: `/admin` (sign in at `/login`). Create, rename and reorder galleries; drag and drop photos to upload; drag to reorder; captions; cover photo; move between galleries; delete (click twice). Changes autosave.
+- **Public site**: `/` lists galleries (or shows one chosen gallery, set under Site → Home page in the admin), `/<slug>` shows a gallery as a justified grid with a PhotoSwipe lightbox (swipe, pinch-zoom), and an optional `/about` page shows a portrait, a bio and a contact email.
+- **Admin**: `/admin` (sign in at `/login`). Create, rename and reorder galleries; drag and drop photos to upload; drag to reorder; captions; cover photo; move between galleries; delete (click twice). Edit the About page (text, email, portrait) under Pages. Changes autosave.
 
 Live: https://smugless.alex-d5b.workers.dev
+
+Demo (Unsplash photos): https://smugless.kuril.in
 
 ## How it works
 
 ```
 R2 bucket smugless-photos (private)
-  manifest.json            galleries, order, titles, captions: the whole site
+  manifest.json            galleries, order, titles, captions, About page: the whole site
   originals/<id>           uploaded files, never served directly
   derived/<id>/<w>.<fmt>   resized copies, made on first request
   trash/<id>               originals of deleted photos
@@ -33,6 +35,22 @@ SMUGLESS_URL=https://smugless.alex-d5b.workers.dev SMUGLESS_PASSWORD="$(cat .adm
 ```
 
 The generated admin password is in `.admin-password` (git-ignored). Signing in sets a 30-day session cookie signed with that password, so changing the secret signs everyone out. Scripts can skip the login page by sending the password via HTTP Basic auth (any username), as `scripts/seed.mjs` does.
+
+## Demo
+
+The demo is the same code deployed as a separate Worker (`smugless-demo`) with its own bucket (`smugless-demo-photos`) and password (`.demo-admin-password`, git-ignored), defined as `env.demo` in `wrangler.jsonc`. It never touches production data.
+
+`scripts/seed.mjs` fills it with six Unsplash galleries (Landscapes, Nature, Cities, Macro, Portraits, Surfing) and an About page for Elena Marsh, a made-up photographer; the page says she's fictional. Re-running it only adds what's missing.
+
+```bash
+npm run deploy:demo                                       # deploy the demo
+npx wrangler secret put ADMIN_PASSWORD --env demo         # change the demo password
+SMUGLESS_URL=https://smugless-demo.alex-d5b.workers.dev SMUGLESS_PASSWORD="$(cat .demo-admin-password)" node scripts/seed.mjs
+npm run deploy:demo-proxy                                 # redeploy the smugless.kuril.in proxy (rarely needed)
+```
+
+`smugless.kuril.in` is served by a tiny Cloudflare Pages project, `smugless-demo-proxy` (`demo-proxy/`), whose `_worker.js` hands every request to `smugless-demo` through a service binding. kuril.in's DNS isn't on Cloudflare, and a Worker can only take a custom domain on a Cloudflare zone, but Pages accepts a subdomain by CNAME from any DNS host: kuril.in has `CNAME smugless → smugless-demo-proxy.pages.dev`. The project is classic Pages, created with `wrangler pages project create --force`; without `--force`, current wrangler turns it into a Worker, which needs a zone again.
+
 ## Limits and costs
 
 - Uploads go through the Worker, so 100 MB per file. Export JPEGs at full resolution; RAW/TIFF/HEIC aren't accepted.

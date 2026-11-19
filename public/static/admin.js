@@ -4,6 +4,7 @@ import Sortable from "/vendor/sortable/sortable.esm.js";
 
 let manifest = null;
 let current = null; // selected gallery object
+let showAbout = false; // About page editor open instead of a gallery
 let selectedPhotoId = null;
 let saveTimer = null;
 let saving = Promise.resolve();
@@ -132,6 +133,7 @@ function confirmButton(label, armedLabel, onConfirm) {
 
 function selectGallery(g) {
   current = g;
+  showAbout = false;
   selectedPhotoId = null;
   history.replaceState(null, "", g ? `#${g.slug}` : "#");
   render();
@@ -241,7 +243,11 @@ function render() {
       { class: "topbar" },
       h("strong", {}, "Smugless"),
       h("span", { id: "status", class: "status ok" }, "All changes saved"),
-      h("a", { href: current ? `/${current.slug}` : "/", target: "_blank", class: "view-link" }, "View site ↗"),
+      h(
+        "a",
+        { href: showAbout ? "/about" : current ? `/${current.slug}` : "/", target: "_blank", class: "view-link" },
+        "View site ↗",
+      ),
       h("form", { method: "post", action: "/logout" }, h("button", { class: "link-btn" }, "Log out")),
     ),
     h("aside", { class: "sidebar", id: "sidebar" }),
@@ -313,6 +319,7 @@ function renderSidebar() {
           },
         }),
       ),
+      homePicker(),
     ),
     h("h2", {}, "Galleries"),
     list,
@@ -331,11 +338,59 @@ function renderSidebar() {
       },
       "+ New gallery",
     ),
+    h("h2", {}, "Pages"),
+    h(
+      "ul",
+      { class: "gallery-list" },
+      h(
+        "li",
+        { class: showAbout ? "active" : "" },
+        h(
+          "button",
+          {
+            class: "gallery-btn",
+            onclick: () => {
+              current = null;
+              showAbout = true;
+              history.replaceState(null, "", "#about");
+              render();
+            },
+          },
+          h("span", { class: "gallery-name" }, "About"),
+          h("span", { class: "count" }, manifest.about ? "on" : "off"),
+        ),
+      ),
+    ),
+  );
+}
+
+// What visitors see at /: the grid of all galleries, or one gallery.
+function homePicker() {
+  return h(
+    "label",
+    {},
+    "Home page",
+    h(
+      "select",
+      {
+        onchange: (e) => {
+          if (e.target.value) manifest.site.home = e.target.value;
+          else delete manifest.site.home;
+          scheduleSave();
+        },
+      },
+      h("option", { value: "" }, "All galleries (grid)"),
+      manifest.galleries.map((g) => h("option", { value: g.slug, selected: manifest.site.home === g.slug }, g.title)),
+    ),
   );
 }
 
 function renderContent() {
   const content = document.getElementById("content");
+  if (showAbout) {
+    renderAbout(content);
+    return;
+  }
   if (!current) {
     content.replaceChildren(
       h(
@@ -350,6 +405,7 @@ function renderContent() {
 
   const slugError = h("span", { class: "field-error" });
   const setSlug = (v) => {
+    if (manifest.site.home === g.slug) manifest.site.home = v;
     g.slug = v;
     history.replaceState(null, "", `#${v}`);
     document.querySelector(".view-link").href = `/${v}`;
@@ -357,6 +413,7 @@ function renderContent() {
   };
   const slugInput = h("input", {
     value: g.slug,
+    onchange: renderSidebar,
     oninput: (e) => {
       const v = e.target.value.toLowerCase();
       e.target.value = v;
@@ -377,6 +434,7 @@ function renderContent() {
         "Title",
         h("input", {
           value: g.title,
+          onchange: renderSidebar,
           oninput: (e) => {
             g.title = e.target.value;
             const btn = document.querySelector(`.gallery-list li.active .gallery-name`);
@@ -416,6 +474,7 @@ function renderContent() {
         async () => {
           const ids = g.photos.map((p) => p.id);
           manifest.galleries = manifest.galleries.filter((x) => x !== g);
+          if (manifest.site.home === g.slug) delete manifest.site.home;
           selectGallery(manifest.galleries[0] ?? null);
           await deletePhotos(ids);
         },
@@ -601,6 +660,144 @@ function renderPanel() {
   );
 }
 
+// ---------- About page ----------
+
+function renderAbout(content) {
+  const a = manifest.about;
+  if (!a) {
+    content.replaceChildren(
+      h(
+        "div",
+        { class: "empty-state" },
+        h("p", {}, "No About page yet. It appears at /about, last in the navigation."),
+        h(
+          "button",
+          {
+            class: "btn primary",
+            onclick: () => {
+              manifest.about = { title: "About", text: "" };
+              scheduleSave();
+              render();
+            },
+          },
+          "Add an About page",
+        ),
+      ),
+    );
+    return;
+  }
+
+  const field = (label, key, props = {}) =>
+    h(
+      "label",
+      {},
+      label,
+      h(props.rows ? "textarea" : "input", {
+        ...props,
+        value: a[key] ?? "",
+        oninput: (e) => {
+          a[key] = e.target.value;
+          scheduleSave();
+        },
+      }),
+    );
+
+  const fileInput = h("input", {
+    type: "file",
+    accept: ACCEPTED.join(","),
+    hidden: true,
+    onchange: (e) => {
+      if (e.target.files[0]) setPortrait(e.target.files[0]);
+      e.target.value = "";
+    },
+  });
+  const portraitMsg = h("span", { class: "muted" });
+
+  async function setPortrait(file) {
+    try {
+      if (!ACCEPTED.includes(file.type)) throw new Error("Use JPEG, PNG, WebP or AVIF");
+      if (file.size > MAX_BYTES) throw new Error("Larger than 100 MB");
+      portraitMsg.textContent = "Uploading…";
+      const { w, h: height } = await dimensions(file);
+      const { id } = await uploadFile(file, (p) => (portraitMsg.textContent = `Uploading… ${Math.round(p * 100)}%`));
+      const old = a.photo;
+      a.photo = { id, w, h: height, filename: file.name, ...(old?.caption ? { caption: old.caption } : {}) };
+      renderAbout(content);
+      if (old) await deletePhotos([old.id]);
+      else await saveNow();
+    } catch (err) {
+      portraitMsg.textContent = err.message;
+    }
+  }
+
+  const drop = h(
+    "div",
+    {
+      class: "dropzone portrait-drop",
+      onclick: () => fileInput.click(),
+      ondragover: (e) => {
+        e.preventDefault();
+        drop.classList.add("over");
+      },
+      ondragleave: () => drop.classList.remove("over"),
+      ondrop: (e) => {
+        e.preventDefault();
+        drop.classList.remove("over");
+        if (e.dataTransfer.files[0]) setPortrait(e.dataTransfer.files[0]);
+      },
+    },
+    a.photo ? h("img", { src: thumb(a.photo.id, 800), alt: "" }) : h("strong", {}, "Drop a portrait here"),
+    h("span", {}, a.photo ? "Drop or click to replace" : "or click to choose"),
+    fileInput,
+  );
+
+  content.replaceChildren(
+    h(
+      "section",
+      { class: "gallery-form about-form" },
+      field("Title", "title"),
+      field("Text", "text", { rows: 12, placeholder: "Separate paragraphs with a blank line." }),
+      field("Contact email", "email", { type: "email", placeholder: "Optional" }),
+      h("h3", {}, "Portrait"),
+      drop,
+      portraitMsg,
+      a.photo
+        ? h(
+            "label",
+            {},
+            "Portrait description (for screen readers)",
+            h("input", {
+              value: a.photo.caption ?? "",
+              placeholder: "e.g. Me with my camera on the beach",
+              oninput: (e) => {
+                a.photo.caption = e.target.value;
+                scheduleSave();
+              },
+            }),
+          )
+        : null,
+      h(
+        "div",
+        { class: "row end" },
+        a.photo
+          ? confirmButton("Remove portrait", "Click again to remove", async () => {
+              const id = a.photo.id;
+              delete a.photo;
+              renderAbout(content);
+              await deletePhotos([id]);
+            })
+          : null,
+        confirmButton("Delete About page", "Click again to delete", async () => {
+          const ids = a.photo ? [a.photo.id] : [];
+          delete manifest.about;
+          render();
+          await deletePhotos(ids);
+        }),
+      ),
+    ),
+  );
+}
+
 // ---------- Boot ----------
 
 async function boot() {
@@ -611,6 +808,11 @@ async function boot() {
   }
   manifest = await res.json();
   const slug = decodeURIComponent(location.hash.slice(1));
+  showAbout = slug === "about";
+  if (showAbout) {
+    render();
+    return;
+  }
   current = manifest.galleries.find((g) => g.slug === slug) ?? manifest.galleries[0] ?? null;
   render();
 }

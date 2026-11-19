@@ -17,9 +17,19 @@ export interface Gallery {
   photos: Photo[]; // display order
 }
 
+// Optional page at /about, linked last in the navigation.
+export interface About {
+  title: string; // heading and nav label, e.g. "About"
+  text: string; // paragraphs separated by blank lines
+  email?: string; // shown as a contact link
+  photo?: Photo; // portrait, not part of any gallery
+}
+
 export interface Manifest {
-  site: { title: string; tagline?: string };
+  // home: slug of a gallery to show at / instead of the grid of all galleries
+  site: { title: string; tagline?: string; home?: string };
   galleries: Gallery[]; // navigation order
+  about?: About;
 }
 
 export interface Env {
@@ -33,7 +43,7 @@ const KEY = "manifest.json";
 export const PHOTO_ID = /^[a-f0-9]{16}$/;
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 // Paths the Worker or static assets already use.
-const RESERVED = new Set(["admin", "api", "img", "login", "logout", "static", "vendor", "favicon.ico", "robots.txt"]);
+const RESERVED = new Set(["about", "admin", "api", "img", "login", "logout", "static", "vendor", "favicon.ico", "robots.txt"]);
 
 export async function loadManifest(bucket: R2Bucket): Promise<Manifest> {
   const obj = await bucket.get(KEY);
@@ -48,6 +58,7 @@ export async function saveManifest(bucket: R2Bucket, m: Manifest): Promise<void>
 }
 
 export function findPhoto(m: Manifest, id: string): Photo | undefined {
+  if (m.about?.photo?.id === id) return m.about.photo;
   for (const g of m.galleries) {
     const p = g.photos.find((p) => p.id === id);
     if (p) return p;
@@ -77,18 +88,9 @@ export function validateManifest(input: unknown): Manifest | string {
 
     const photos: Photo[] = [];
     for (const p of g.photos) {
-      if (typeof p?.id !== "string" || !PHOTO_ID.test(p.id)) return "Invalid photo id";
-      if (ids.has(p.id)) return `Photo ${p.filename ?? p.id} appears twice`;
-      ids.add(p.id);
-      if (!Number.isInteger(p.w) || !Number.isInteger(p.h) || p.w <= 0 || p.h <= 0)
-        return `Photo ${p.filename ?? p.id} has invalid dimensions`;
-      photos.push({
-        id: p.id,
-        w: p.w,
-        h: p.h,
-        filename: String(p.filename ?? ""),
-        ...(typeof p.caption === "string" && p.caption.trim() ? { caption: p.caption } : {}),
-      });
+      const photo = cleanPhoto(p, ids);
+      if (typeof photo === "string") return photo;
+      photos.push(photo);
     }
 
     galleries.push({
@@ -100,11 +102,50 @@ export function validateManifest(input: unknown): Manifest | string {
     });
   }
 
+  let about: About | undefined;
+  if (obj.about != null) {
+    const a = obj.about;
+    if (typeof a !== "object") return "about must be an object";
+    if (typeof a.title !== "string" || !a.title.trim()) return "The About page needs a title";
+    if (typeof a.text !== "string") return "About text must be a string";
+    let photo: Photo | undefined;
+    if (a.photo != null) {
+      const p = cleanPhoto(a.photo, ids);
+      if (typeof p === "string") return p;
+      photo = p;
+    }
+    about = {
+      title: a.title.trim(),
+      text: a.text,
+      ...(typeof a.email === "string" && a.email.trim() ? { email: a.email.trim() } : {}),
+      ...(photo ? { photo } : {}),
+    };
+  }
+
   return {
     site: {
       title: site.title.trim(),
       ...(typeof site.tagline === "string" && site.tagline.trim() ? { tagline: site.tagline } : {}),
+      // Dropped if it no longer names a gallery (renamed or deleted), like a stale cover.
+      ...(typeof site.home === "string" && slugs.has(site.home) ? { home: site.home } : {}),
     },
     galleries,
+    ...(about ? { about } : {}),
+  };
+}
+
+/** Checks one photo entry and records its id in `ids` (ids are unique site-wide). */
+function cleanPhoto(p: any, ids: Set<string>): Photo | string {
+  if (typeof p?.id !== "string" || !PHOTO_ID.test(p.id)) return "Invalid photo id";
+  if (ids.has(p.id)) return `Photo ${p.filename ?? p.id} appears twice`;
+  ids.add(p.id);
+  if (!Number.isInteger(p.w) || !Number.isInteger(p.h) || p.w <= 0 || p.h <= 0)
+    return `Photo ${p.filename ?? p.id} has invalid dimensions`;
+  return {
+    id: p.id,
+    w: p.w,
+    h: p.h,
+    filename: String(p.filename ?? ""),
+    ...(typeof p.caption === "string" && p.caption.trim() ? { caption: p.caption } : {}),
   };
 }

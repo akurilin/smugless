@@ -9,6 +9,17 @@
   "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "smugless-photos" }],
   // Cloudflare Images binding, used to resize originals on first request
   "images": { "binding": "IMAGES" },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
   // Secret (set with `wrangler secret put ADMIN_PASSWORD`): password for /admin
+
+  "env": {
+    // Public demo with Unsplash photos: `npm run deploy:demo`. Separate Worker
+    // (smugless-demo), bucket and ADMIN_PASSWORD secret, so it never touches production.
+    "demo": {
+      "name": "smugless-demo",
+      "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "smugless-demo-photos" }],
+      "images": { "binding": "IMAGES" },
+      "observability": { "enabled": true }
+    }
+  }
 }

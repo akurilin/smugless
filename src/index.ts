@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { checkPassword, endSession, requireAdmin, startSession } from "./auth";
 import { serveImage, WIDTHS, type Format } from "./images";
 import { findPhoto, loadManifest, PHOTO_ID, saveManifest, validateManifest, type Env } from "./manifest";
-import { adminPage, galleryPage, homePage, loginPage, notFoundPage } from "./views";
+import { aboutPage, adminPage, galleryPage, homePage, loginPage, notFoundPage } from "./views";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -108,7 +108,17 @@ app.delete("/api/photos/:id", async (c) => {
 
 app.get("/", async (c) => {
   const m = await loadManifest(c.env.BUCKET);
-  return c.html(homePage(m, new URL(c.req.url).origin), 200, { "Cache-Control": PAGE_CACHE });
+  const origin = new URL(c.req.url).origin;
+  // The landing page is either the grid of all galleries or one chosen gallery.
+  const home = m.site.home ? m.galleries.find((g) => g.slug === m.site.home) : undefined;
+  const page = home ? galleryPage(m, home, origin, { isHome: true }) : homePage(m, origin);
+  return c.html(page, 200, { "Cache-Control": PAGE_CACHE });
+});
+
+app.get("/about", async (c) => {
+  const m = await loadManifest(c.env.BUCKET);
+  if (!m.about) return c.html(notFoundPage(m), 404);
+  return c.html(aboutPage(m, m.about, new URL(c.req.url).origin), 200, { "Cache-Control": PAGE_CACHE });
 });
 
 app.get("/:slug", async (c) => {

@@ -1,6 +1,6 @@
 import { html } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { Gallery, Manifest, Photo } from "./manifest";
+import type { About, Gallery, Manifest, Photo } from "./manifest";
 import { displaySize, imageUrl, srcset } from "./images";
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -37,6 +37,9 @@ ${opts.ogImage ? html`<meta property="og:image" content="${opts.ogImage}">` : ""
       (g) =>
         html`<a href="/${g.slug}"${opts.current === g.slug ? html` aria-current="page"` : ""}>${g.title}</a>`,
     )}
+    ${m.about
+      ? html`<a href="/about"${opts.current === "about" ? html` aria-current="page"` : ""}>${m.about.title}</a>`
+      : ""}
   </nav>
 </header>
 <main>${opts.body}</main>
@@ -77,7 +80,7 @@ export function homePage(m: Manifest, origin: string): Html {
   });
 }
 
-export function galleryPage(m: Manifest, g: Gallery, origin: string): Html {
+export function galleryPage(m: Manifest, g: Gallery, origin: string, opts: { isHome?: boolean } = {}): Html {
   const cover = coverOf(g);
   const tiles = g.photos.map((p, i) => {
     const ratio = +(p.w / p.h).toFixed(4);
@@ -99,8 +102,8 @@ export function galleryPage(m: Manifest, g: Gallery, origin: string): Html {
   });
 
   return layout(m, {
-    title: `${g.title} · ${m.site.title}`,
-    description: g.description?.slice(0, 200),
+    title: opts.isHome ? m.site.title : `${g.title} · ${m.site.title}`,
+    description: (opts.isHome ? m.site.tagline : undefined) ?? g.description?.slice(0, 200),
     ogImage: cover ? origin + imageUrl(cover.id, 1200, "jpg") : undefined,
     current: g.slug,
     body: html`
@@ -110,6 +113,35 @@ export function galleryPage(m: Manifest, g: Gallery, origin: string): Html {
       </section>
       ${g.photos.length ? html`<div class="grid">${tiles}</div>` : html`<p class="empty">No photos yet.</p>`}
       <script type="module" src="/static/gallery.js"></script>
+    `,
+  });
+}
+
+export function aboutPage(m: Manifest, about: About, origin: string): Html {
+  const p = about.photo;
+  const sizes = "(max-width: 760px) 100vw, 420px";
+  return layout(m, {
+    title: `${about.title} · ${m.site.title}`,
+    description: about.text.split(/\n\s*\n/)[0]?.slice(0, 200),
+    ogImage: p ? origin + imageUrl(p.id, 1200, "jpg") : undefined,
+    current: "about",
+    body: html`
+      <article class="about${p ? "" : " no-photo"}">
+        ${p
+          ? html`<picture class="about-photo">
+              <source type="image/avif" srcset="${srcset(p, "avif")}" sizes="${sizes}">
+              <img src="${imageUrl(p.id, 800, "webp")}" srcset="${srcset(p, "webp")}" sizes="${sizes}"
+                   width="${p.w}" height="${p.h}" alt="${p.caption ?? ""}" fetchpriority="high" decoding="async">
+            </picture>`
+          : ""}
+        <div class="about-text">
+          <h1>${about.title}</h1>
+          ${paragraphs(about.text)}
+          ${about.email
+            ? html`<p class="about-contact"><span>Get in touch</span><a href="mailto:${about.email}">${about.email}</a></p>`
+            : ""}
+        </div>
+      </article>
     `,
   });
 }

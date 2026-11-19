@@ -245,3 +245,9 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 }
 .login h1 { margin: 0 0 4px; font-size: 18px; letter-spacing: 0.12em; text-transform: uppercase; }
 .btn.danger.armed { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* About page editor */
+.about-form { max-width: 720px; }
+.about-form h3 { margin: 18px 0 6px; font-size: 14px; }
+.portrait-drop { max-width: 320px; }
+.portrait-drop img { display: block; width: 100%; height: auto; margin-bottom: 8px; border-radius: 4px; }
