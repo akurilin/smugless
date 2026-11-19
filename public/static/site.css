@@ -115,8 +115,15 @@ main { flex: 1; padding: 0 var(--pad) 48px; }
   line-height: 1.15;
   margin: 0 0 10px;
 }
-.description { color: var(--muted); }
-.description p { margin: 0 0 0.8em; }
+/* Gallery pages show only the photos; the title stays for screen readers and search. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* Justified grid: each tile grows in proportion to its aspect ratio (--r),
    so every row ends up the same height without any JavaScript. */

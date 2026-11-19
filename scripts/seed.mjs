@@ -16,6 +16,17 @@ const auth = { Authorization: "Basic " + Buffer.from(`seed:${PASSWORD}`).toStrin
 // Unsplash photo ids (images.unsplash.com/photo-<id>)
 const GALLERIES = [
   {
+    slug: "surfing",
+    title: "Surfing",
+    description: "Early mornings in the water.",
+    photos: [
+      "1530870110042-98b2cb110834", "1787894653068-bf1eeb927af4", "1526342122811-2a9c8512023d",
+      "1559627755-42212e5c5fdf", "1535182463927-440364075d9c", "1771197265637-3ed8f0039e20",
+      "1609870025624-98b62826e80a", "1527731149372-fae504a1185f", "1513569143478-b38b2c0ef97f",
+      "1517699418036-fb5d179fef0c", "1493225255756-d9584f8606e9",
+    ],
+  },
+  {
     slug: "landscapes",
     title: "Landscapes",
     description: "Mountains, lakes and long roads.",
@@ -67,22 +78,11 @@ const GALLERIES = [
       "1498551172505-8ee7ad69f235",
     ],
   },
-  {
-    slug: "surfing",
-    title: "Surfing",
-    description: "Early mornings in the water.",
-    photos: [
-      "1530870110042-98b2cb110834", "1787894653068-bf1eeb927af4", "1526342122811-2a9c8512023d",
-      "1559627755-42212e5c5fdf", "1535182463927-440364075d9c", "1771197265637-3ed8f0039e20",
-      "1609870025624-98b62826e80a", "1527731149372-fae504a1185f", "1513569143478-b38b2c0ef97f",
-      "1517699418036-fb5d179fef0c", "1493225255756-d9584f8606e9",
-    ],
-  },
 ];
 
 // A made-up photographer for the demo's About page. The portrait hides the face
 // behind a camera, so no real, recognizable person stands in for a fictional one.
-const SITE = { title: "Elena Marsh", tagline: "Landscapes, oceans and small things, from the Northern California coast." };
+const SITE = { title: "Elena Marsh", home: "surfing", tagline: "Landscapes, oceans and small things, from the Northern California coast." };
 const ABOUT = {
   title: "About",
   portrait: "1549981832-2ba2ee913334",
@@ -143,6 +143,7 @@ const save = () =>
 if (["Portfolio", "Smugless"].includes(manifest.site.title)) {
   manifest.site.title = SITE.title;
   manifest.site.tagline = SITE.tagline;
+  manifest.site.home = SITE.home; // land on a gallery rather than the grid (first gallery, so it exists by the first save)
 }
 
 for (const def of GALLERIES) {

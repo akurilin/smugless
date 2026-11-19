@@ -2,7 +2,7 @@
 
 A small self-hosted photo portfolio: one Cloudflare Worker, one private R2 bucket, Cloudflare Images for resizing.
 
-- **Public site**: `/` lists galleries (or shows one chosen gallery, set under Site → Home page in the admin), `/<slug>` shows a gallery as a justified grid with a PhotoSwipe lightbox (swipe, pinch-zoom), and an optional `/about` page shows a portrait, a bio and a contact email.
+- **Public site**: `/` lists galleries (or shows one chosen gallery, set under Site → Home page in the admin), `/<slug>` shows a gallery as a justified grid with a PhotoSwipe lightbox (swipe, pinch-zoom) and no heading, just the photos (the description is used for search and link previews), and an optional `/about` page shows a portrait, a bio and a contact email.
 - **Admin**: `/admin` (sign in at `/login`). Create, rename and reorder galleries; drag and drop photos to upload; drag to reorder; captions; cover photo; move between galleries; delete (click twice). Edit the About page (text, email, portrait) under Pages. Changes autosave.
 
 Live: https://smugless.alex-d5b.workers.dev
@@ -40,7 +40,7 @@ The generated admin password is in `.admin-password` (git-ignored). Signing in s
 
 The demo is the same code deployed as a separate Worker (`smugless-demo`) with its own bucket (`smugless-demo-photos`) and password (`.demo-admin-password`, git-ignored), defined as `env.demo` in `wrangler.jsonc`. It never touches production data.
 
-`scripts/seed.mjs` fills it with six Unsplash galleries (Landscapes, Nature, Cities, Macro, Portraits, Surfing) and an About page for Elena Marsh, a made-up photographer; the page says she's fictional. Re-running it only adds what's missing.
+`scripts/seed.mjs` fills it with six Unsplash galleries (Surfing, Landscapes, Nature, Cities, Macro, Portraits; Surfing is the home page) and an About page for Elena Marsh, a made-up photographer; the page says she's fictional. Re-running it only adds what's missing.
 
 ```bash
 npm run deploy:demo                                       # deploy the demo

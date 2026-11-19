@@ -107,10 +107,7 @@ export function galleryPage(m: Manifest, g: Gallery, origin: string, opts: { isH
     ogImage: cover ? origin + imageUrl(cover.id, 1200, "jpg") : undefined,
     current: g.slug,
     body: html`
-      <section class="gallery-head">
-        <h1>${g.title}</h1>
-        ${g.description ? html`<div class="description">${paragraphs(g.description)}</div>` : ""}
-      </section>
+      <h1 class="visually-hidden">${g.title}</h1>
       ${g.photos.length ? html`<div class="grid">${tiles}</div>` : html`<p class="empty">No photos yet.</p>`}
       <script type="module" src="/static/gallery.js"></script>
     `,
