@@ -4,3 +4,7 @@ node_modules/
 .admin-password
 .demo-admin-password
 .cloudflare-token
+.env
+.env.*
+*.log
+.DS_Store
