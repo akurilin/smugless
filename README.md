@@ -2,14 +2,31 @@
 
 An open-source photo portfolio website with a built-in admin for managing your galleries, built to be extremely cheap to host. Hosted portfolio services charge a monthly subscription; smugless runs on your own Cloudflare account and, for a typical portfolio, fits entirely in Cloudflare's free tiers, so you pay nothing beyond a domain name (and even that's optional).
 
-Under the hood it's one Worker, one private R2 bucket, and Cloudflare Images for resizing. No servers to run, no database, no build step.
+### 👉 [Try the live demo: smugless.kuril.in](https://smugless.kuril.in)
 
-**Live demo:** https://smugless.kuril.in (photos from Unsplash; the photographer is fictional)
+[![The smugless demo site: a gallery of surfing photos laid out edge to edge](docs/gallery.jpg)](https://smugless.kuril.in)
+
+The demo is a complete portfolio for Elena Marsh, a fictional photographer, with six galleries of Unsplash photos. Things to try:
+
+- **Click any photo** for the full-screen viewer; use the arrow keys or swipe, and pinch to zoom on a phone.
+- **Browse the galleries** in the menu. The site opens straight into Surfing, but it can also open on a grid of all galleries.
+- **Visit the [About page](https://smugless.kuril.in/about)**, with a portrait, bio and contact link.
+- **Resize the window or open it on your phone.** Photos grow on big screens, and the site follows your light or dark mode.
+
+| [Full-screen viewer](https://smugless.kuril.in/landscapes) | [About page](https://smugless.kuril.in/about) |
+|---|---|
+| [![A landscape photo open in the full-screen viewer](docs/lightbox.jpg)](https://smugless.kuril.in/landscapes) | [![The About page: portrait beside a short bio](docs/about.jpg)](https://smugless.kuril.in/about) |
+
+**The admin**, where you manage everything. It's password-protected on the demo, so here's what it looks like:
+
+![The admin: site settings and galleries on the left, the Surfing gallery's photos on the right](docs/admin.png)
+
+Under the hood it's one Worker, one private R2 bucket, and Cloudflare Images for resizing. No servers to run, no database, no build step.
 
 ## Features
 
 **Public site**
-- Galleries as justified photo grids, with a full-screen lightbox (swipe, pinch-zoom, captions). Gallery pages show just the photos; titles and descriptions feed search results and link previews.
+- Galleries as justified photo grids that grow with the screen, so photos stay large on big monitors, with a full-screen lightbox (swipe, pinch-zoom, captions). Gallery pages show just the photos; titles and descriptions feed search results and link previews.
 - A home page that shows either a grid of all galleries or one gallery of your choice.
 - An optional About page with a portrait, a bio and a contact email.
 - Responsive images in AVIF and WebP at five widths, generated on first request and cached. Resized copies carry no EXIF data, GPS included.

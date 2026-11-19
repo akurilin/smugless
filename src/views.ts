@@ -85,8 +85,8 @@ export function galleryPage(m: Manifest, g: Gallery, origin: string, opts: { isH
   const tiles = g.photos.map((p, i) => {
     const ratio = +(p.w / p.h).toFixed(4);
     const full = displaySize(p, 2400);
-    // Rough rendered width in a justified row (row height ~300px desktop, ~180px phone).
-    const sizes = `(max-width: 640px) ${Math.min(100, Math.round(ratio * 50))}vw, ${Math.round(ratio * 340)}px`;
+    // Rough rendered width in a justified row; matches --row in site.css (rows also stretch a little to fill).
+    const sizes = `(max-width: 640px) ${Math.min(100, Math.round(ratio * 65))}vw, (max-width: 1100px) ${Math.round(ratio * 380)}px, ${Math.round(ratio * 32)}vw`;
     const eager = i < 4;
     return html`<a class="tile" style="--r:${ratio}" href="${imageUrl(p.id, 2400, "webp")}"
         data-pswp-width="${full.w}" data-pswp-height="${full.h}"
@@ -157,12 +157,12 @@ export function loginPage(error?: string): Html {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Sign in · Smugless</title>
+<title>Sign in · smugless</title>
 <link rel="stylesheet" href="/static/admin.css">
 </head>
 <body class="login-body">
 <form class="login" method="post" action="/login">
-  <h1>Smugless</h1>
+  <h1>smugless</h1>
   <input type="hidden" name="username" value="admin" autocomplete="username">
   <label>Password
     <input type="password" name="password" autocomplete="current-password" required autofocus>
@@ -181,7 +181,7 @@ export function adminPage(): Html {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Smugless admin</title>
+<title>smugless admin</title>
 <link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>

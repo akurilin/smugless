@@ -91,7 +91,7 @@ const ABOUT = {
     "I photograph the places where the land runs out: coastlines, ridgelines, the edges of cities at first light. Most of my work starts with a long drive and an early alarm, and ends with whatever the weather decides to give me.",
     "I grew up in Santa Cruz with a surfboard long before a camera, and the ocean is still where I spend most mornings. Over the last decade I've shot for travel and outdoor brands, followed surf contests up and down the Pacific coast, and made portraits of the people I meet along the way. The macro work started as a rainy-day project and never stopped.",
     "I'm available for editorial and commercial commissions, and prints of everything here are available on request.",
-    "This is a demo of Smugless: Elena is fictional, and every photo on this site comes from Unsplash.",
+    "This is a demo of smugless: Elena is fictional, and every photo on this site comes from Unsplash.",
   ].join("\n\n"),
 };
 

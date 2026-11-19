@@ -85,7 +85,7 @@ main { flex: 1; padding: 0 var(--pad) 48px; }
 /* Home: gallery cards */
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(300px, 22vw)), 1fr));
   gap: 36px 20px;
 }
 .card { text-decoration: none; display: grid; gap: 2px; }
@@ -128,7 +128,10 @@ main { flex: 1; padding: 0 var(--pad) 48px; }
 /* Justified grid: each tile grows in proportion to its aspect ratio (--r),
    so every row ends up the same height without any JavaScript. */
 .grid {
-  --row: 320px;
+  /* Target row height grows with the window, so big screens get big photos
+     (~440px at 2000px wide), capped by the window's height. Rows then stretch
+     up to ~1.5x to fill the width exactly. */
+  --row: clamp(300px, 22vw, 50vh);
   display: flex;
   flex-wrap: wrap;
   gap: var(--gap);

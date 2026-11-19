@@ -241,7 +241,7 @@ function render() {
     h(
       "header",
       { class: "topbar" },
-      h("strong", {}, "Smugless"),
+      h("strong", {}, "smugless"),
       h("span", { id: "status", class: "status ok" }, "All changes saved"),
       h(
         "a",
