@@ -50,7 +50,11 @@ app.post("/logout", logout);
 app.use("/admin", requireAdmin);
 app.use("/api/*", requireAdmin);
 
-app.get("/admin", (c) => c.html(adminPage(), 200, { "Cache-Control": "no-store" }));
+app.get("/admin", async (c) => {
+  // Read the saved site icon for the admin tab.
+  const m = await loadManifest(c.env.BUCKET);
+  return c.html(adminPage(m), 200, { "Cache-Control": "no-store" });
+});
 
 app.get("/api/manifest", async (c) => {
   c.header("Cache-Control", "no-store");

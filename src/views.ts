@@ -187,7 +187,7 @@ export function loginPage(error?: string): Html {
 </html>`;
 }
 
-export function adminPage(): Html {
+export function adminPage(m: Manifest): Html {
   return html`<!doctype html>
 <html lang="en">
 <head>
@@ -195,6 +195,7 @@ export function adminPage(): Html {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>smugless admin</title>
+${iconHead(m)}
 <link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>
