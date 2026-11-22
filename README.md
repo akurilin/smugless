@@ -12,7 +12,7 @@ Visitors get light, responsive galleries and a full-screen viewer with captions,
 
 Sign in at `/login` with a password or a configured Google account. Changes save automatically.
 
-- **Organize galleries.** Create and reorder galleries. Drag and drop to upload and reorder photos. Add captions, choose covers, and move photos between galleries.
+- **Organize galleries.** Drag and drop to upload and reorder photos. Drop a photo on another gallery in the sidebar to move it. Add captions and choose covers.
 - **Share by direct link.** Hide a gallery from the home page and navigation while keeping its URL available.
 - **Customize the portfolio.** Choose a gallery or a grid for the home page. Set the site title and tagline, upload a header logo and favicon, and add an About page with a portrait, bio, and contact email.
 - **Limit public photo size.** Originals stay in private storage. The app automatically caps each public copy at the smaller of 1,600 px and 75% of the original's longest side. You can turn the limit off.
