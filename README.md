@@ -18,7 +18,7 @@ Sign in at `/login` with a password or a configured Google account. Changes save
 - **Limit public photo size.** Originals stay in private storage. The app automatically caps each public copy at the smaller of 1,600 px and 75% of the original's longest side. You can turn the limit off.
 - **Track storage.** See your photo count, storage use, and estimated monthly R2 storage cost.
 
-![Smugless admin panel with gallery settings and photo thumbnails](docs/admin.png)
+![Smugless admin panel showing gallery settings, the photo editor, and the storage estimate](docs/admin.png)
 
 Uploads support JPEG, PNG, WebP, and AVIF up to 100 MiB per file.
 
