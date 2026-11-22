@@ -6,6 +6,7 @@ let manifest = null;
 let current = null; // selected gallery object
 let showAbout = false; // About page editor open instead of a gallery
 let selectedPhotoId = null;
+let hostingCost;
 let saveTimer = null;
 let saving = Promise.resolve();
 
@@ -13,6 +14,9 @@ const MAX_BYTES = 100 * 1024 * 1024; // Workers request body limit
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 const CONFIRM_TIMEOUT_MS = 4000;
 const PHOTO_DELETE_CLASS = "photo-delete";
+const usdFormat = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const gbFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+const MIN_DISPLAY_GB = 0.01;
 const thumb = (id, w = 400) => `/img/${id}/${w}.webp`;
 
 // ---------- Tiny DOM helper ----------
@@ -40,6 +44,17 @@ async function api(path, init) {
     throw new Error("Signed out");
   }
   return res;
+}
+
+async function refreshHostingCost() {
+  // Keep the editor usable if the R2 estimate takes time or fails.
+  try {
+    const res = await api("/api/hosting-cost");
+    hostingCost = res.ok ? await res.json() : null;
+  } catch {
+    hostingCost = null;
+  }
+  renderHostingCost();
 }
 
 // ---------- Saving ----------
@@ -147,6 +162,7 @@ async function deletePhotos(ids) {
     const res = await api(`/api/photos/${id}`, { method: "DELETE" });
     if (!res.ok && res.status !== 404) setStatus(`Could not delete a photo (${res.status})`, "error");
   }
+  if (ids.length) refreshHostingCost();
 }
 
 // ---------- Uploads ----------
@@ -233,6 +249,7 @@ async function uploadFiles(files, gallery) {
       while (next < jobs.length) await run(jobs[next++]);
     }),
   );
+  if (jobs.some((job) => job.photo)) refreshHostingCost();
 }
 
 // ---------- Rendering ----------
@@ -378,6 +395,35 @@ function renderSidebar() {
         ),
       ),
     ),
+    h(
+      "section",
+      { "aria-labelledby": "hosting-cost-heading" },
+      h("h2", { id: "hosting-cost-heading" }, "Monthly hosting estimate"),
+      h("div", { id: "hosting-cost", class: "hosting-cost", "aria-live": "polite" }),
+    ),
+  );
+  renderHostingCost();
+}
+
+function renderHostingCost() {
+  const panel = document.getElementById("hosting-cost");
+  if (!panel) return;
+
+  // Count all active photos. Storage also includes site assets and deleted photos.
+  const count = manifest.galleries.reduce((n, g) => n + g.photos.length, manifest.about?.photo ? 1 : 0);
+  const photos = `${count.toLocaleString("en-US")} ${count === 1 ? "photo" : "photos"}`;
+  if (!hostingCost) {
+    panel.replaceChildren(h("span", {}, photos), hostingCost === null ? "Estimate unavailable" : "Calculating…");
+    return;
+  }
+
+  const gb = hostingCost.storageGB;
+  const stored = gb > 0 && gb < MIN_DISPLAY_GB ? `<${MIN_DISPLAY_GB}` : gbFormat.format(gb);
+  panel.replaceChildren(
+    h("div", {}, h("strong", {}, usdFormat.format(hostingCost.monthlyUSD)), " / month"),
+    h("div", {}, `${photos} · ${stored} GB in R2`),
+    h("div", { class: "muted" }, "Includes cached copies and trash. Assumes free requests and resizes and the full R2 allowance."),
+    h("a", { href: "https://developers.cloudflare.com/r2/pricing/", target: "_blank", rel: "noopener noreferrer" }, "R2 Standard pricing"),
   );
 }
 
@@ -415,7 +461,10 @@ function siteImagePicker(key, { label, preview, emptyText, resetText, guidance }
     else delete manifest.site[key];
     // Save the new reference before using it in the preview or removing the old file.
     if (old) await deletePhotos([old.id]);
-    else await saveNow();
+    else {
+      await saveNow();
+      refreshHostingCost();
+    }
     renderSidebar();
   }
 
@@ -851,7 +900,10 @@ function renderAbout(content) {
       a.photo = { id, w, h: height, filename: file.name, ...(old?.caption ? { caption: old.caption } : {}) };
       renderAbout(content);
       if (old) await deletePhotos([old.id]);
-      else await saveNow();
+      else {
+        await saveNow();
+        refreshHostingCost();
+      }
     } catch (err) {
       portraitMsg.textContent = err.message;
     }
@@ -936,12 +988,9 @@ async function boot() {
   manifest = await res.json();
   const slug = decodeURIComponent(location.hash.slice(1));
   showAbout = slug === "about";
-  if (showAbout) {
-    render();
-    return;
-  }
-  current = manifest.galleries.find((g) => g.slug === slug) ?? manifest.galleries[0] ?? null;
+  if (!showAbout) current = manifest.galleries.find((g) => g.slug === slug) ?? manifest.galleries[0] ?? null;
   render();
+  refreshHostingCost();
 }
 
 boot();

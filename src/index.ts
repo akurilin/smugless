@@ -10,6 +10,9 @@ const app = new Hono<{ Bindings: Env }>();
 
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 const PAGE_CACHE = "public, max-age=60";
+const BYTES_PER_GB = 1_000_000_000;
+const R2_FREE_GB_MONTH = 10;
+const R2_USD_PER_GB_MONTH = 0.015;
 
 // ---------- Images ----------
 
@@ -59,6 +62,22 @@ app.get("/admin", async (c) => {
 app.get("/api/manifest", async (c) => {
   c.header("Cache-Control", "no-store");
   return c.json(await loadManifest(c.env.BUCKET));
+});
+
+app.get("/api/hosting-cost", async (c) => {
+  // List object sizes so the estimate includes existing files, cached copies, and trash.
+  let bytes = 0;
+  let cursor: string | undefined;
+  do {
+    const page: R2Objects = await c.env.BUCKET.list({ cursor });
+    for (const object of page.objects) bytes += object.size;
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+
+  // Project the current storage level over a full month of R2 Standard storage.
+  const storageGB = bytes / BYTES_PER_GB;
+  const billableGB = Math.max(0, Math.ceil(storageGB) - R2_FREE_GB_MONTH);
+  return c.json({ storageGB, monthlyUSD: billableGB * R2_USD_PER_GB_MONTH });
 });
 
 app.put("/api/manifest", async (c) => {
