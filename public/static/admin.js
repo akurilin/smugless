@@ -322,7 +322,21 @@ function renderSidebar() {
         }),
       ),
       homePicker(),
-      iconPicker(),
+      siteImagePicker("logo", {
+        label: "Header logo",
+        preview: (logo) => logo && thumb(logo.id),
+        emptyText: "Upload logo",
+        resetText: "Use site title",
+        guidance: "360 × 64 px recommended. The logo fits within 180 × 32 px. Use a transparent PNG.",
+      }),
+      siteImagePicker("icon", {
+        label: "Site icon",
+        preview: (icon) => icon
+          ? `/icon.png?v=${icon.id}`
+          : `/favicon.svg?v=${encodeURIComponent(manifest.site.title.trim().charAt(0))}`,
+        emptyText: "Default letter icon · drop a square image to replace",
+        resetText: "Use default icon",
+      }),
     ),
     h("h2", {}, "Galleries"),
     list,
@@ -390,27 +404,29 @@ function homePicker() {
   );
 }
 
-// Favicon: an uploaded square image, or a generated letter icon when there's none.
-function iconPicker() {
-  const icon = manifest.site.icon;
+function siteImagePicker(key, { label, preview, emptyText, resetText, guidance }) {
+  const asset = manifest.site[key];
   const msg = h("span", { class: "muted" });
-  const preview = icon
-    ? `/icon.png?v=${icon.id}`
-    : `/favicon.svg?v=${encodeURIComponent(manifest.site.title.trim().charAt(0))}`;
+  const previewSrc = preview(asset);
 
-  async function setIcon(file) {
+  async function saveAsset(next) {
+    const old = manifest.site[key];
+    if (next) manifest.site[key] = next;
+    else delete manifest.site[key];
+    // Save the new reference before using it in the preview or removing the old file.
+    if (old) await deletePhotos([old.id]);
+    else await saveNow();
+    renderSidebar();
+  }
+
+  async function uploadAsset(file) {
     try {
       if (!ACCEPTED.includes(file.type)) throw new Error("Use PNG, JPEG, WebP or AVIF");
       if (file.size > MAX_BYTES) throw new Error("Larger than 100 MB");
       msg.textContent = "Uploading…";
       const { w, h: height } = await dimensions(file);
       const { id } = await uploadFile(file, (p) => (msg.textContent = `Uploading… ${Math.round(p * 100)}%`));
-      const old = manifest.site.icon;
-      manifest.site.icon = { id, w, h: height, filename: file.name };
-      // The preview route reads the saved icon from the manifest.
-      if (old) await deletePhotos([old.id]);
-      else await saveNow();
-      renderSidebar();
+      await saveAsset({ id, w, h: height, filename: file.name });
     } catch (err) {
       msg.textContent = err.message;
     }
@@ -421,14 +437,16 @@ function iconPicker() {
     accept: ACCEPTED.join(","),
     hidden: true,
     onchange: (e) => {
-      if (e.target.files[0]) setIcon(e.target.files[0]);
+      if (e.target.files[0]) uploadAsset(e.target.files[0]);
       e.target.value = "";
     },
   });
   const drop = h(
-    "div",
+    "button",
     {
-      class: "dropzone icon-drop",
+      type: "button",
+      class: "dropzone site-image-drop",
+      "aria-label": `${asset ? "Replace" : "Upload"} ${label.toLowerCase()}`,
       onclick: () => fileInput.click(),
       ondragover: (e) => {
         e.preventDefault();
@@ -438,26 +456,28 @@ function iconPicker() {
       ondrop: (e) => {
         e.preventDefault();
         drop.classList.remove("over");
-        if (e.dataTransfer.files[0]) setIcon(e.dataTransfer.files[0]);
+        if (e.dataTransfer.files[0]) uploadAsset(e.dataTransfer.files[0]);
       },
     },
-    h("img", { src: preview, alt: "", width: 32, height: 32 }),
-    h("span", {}, icon ? "Drop or click to replace" : "Default letter icon · drop a square image to replace"),
-    fileInput,
+    previewSrc && h("img", { src: previewSrc, alt: "" }),
+    h("span", {}, asset ? "Drop or click to replace" : emptyText),
   );
 
   return h(
     "div",
-    { class: "icon-field" },
-    h("span", { class: "label" }, "Site icon"),
+    { class: `site-image-field ${key}-field` },
+    h("span", { class: "label" }, label),
     drop,
+    fileInput,
+    guidance && h("span", {}, guidance),
     msg,
-    icon
-      ? confirmButton("Use default icon", "Click again to remove", async () => {
-          const id = icon.id;
-          delete manifest.site.icon;
-          renderSidebar();
-          await deletePhotos([id]);
+    asset
+      ? confirmButton(resetText, "Click again to remove", async () => {
+          try {
+            await saveAsset(null);
+          } catch (err) {
+            msg.textContent = err.message;
+          }
         })
       : null,
   );

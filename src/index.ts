@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { checkPassword, endSession, requireAdmin, startSession } from "./auth";
+import { googleCallback, login, logout, passwordLogin, requireAdmin } from "./auth";
+import { GOOGLE_CALLBACK_PATH } from "./google-auth";
 import { defaultIconResponse, uploadedIconResponse } from "./icon";
 import { serveImage, WIDTHS, type Format } from "./images";
 import { findPhoto, listedGalleries, loadManifest, PHOTO_ID, saveManifest, validateManifest, type Env } from "./manifest";
-import { aboutPage, adminPage, galleryPage, homePage, loginPage, notFoundPage } from "./views";
+import { aboutPage, adminPage, galleryPage, homePage, notFoundPage } from "./views";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -41,21 +42,10 @@ app.get("/favicon.ico", async (c) => {
 
 // ---------- Admin ----------
 
-app.get("/login", (c) => c.html(loginPage(), 200, { "Cache-Control": "no-store" }));
-
-app.post("/login", async (c) => {
-  const body = await c.req.parseBody();
-  if (await checkPassword(c, String(body.password ?? ""))) {
-    await startSession(c);
-    return c.redirect("/admin", 303);
-  }
-  return c.html(loginPage("Wrong password"), 401);
-});
-
-app.post("/logout", (c) => {
-  endSession(c);
-  return c.redirect("/", 303);
-});
+app.get("/login", login);
+app.post("/login", passwordLogin);
+app.get(GOOGLE_CALLBACK_PATH, googleCallback);
+app.post("/logout", logout);
 
 app.use("/admin", requireAdmin);
 app.use("/api/*", requireAdmin);
@@ -108,7 +98,7 @@ app.delete("/api/photos/:id", async (c) => {
   const id = c.req.param("id");
   if (!PHOTO_ID.test(id)) return c.json({ error: "Invalid id" }, 400);
   const manifest = await loadManifest(c.env.BUCKET);
-  if (findPhoto(manifest, id)) return c.json({ error: "Photo is still in a gallery; save first" }, 409);
+  if (findPhoto(manifest, id)) return c.json({ error: "Photo is still in use; save first" }, 409);
 
   const original = await c.env.BUCKET.get(`originals/${id}`);
   if (original) {

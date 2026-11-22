@@ -11,7 +11,7 @@ The demo is a complete portfolio for Elena Marsh, a fictional photographer, with
 - **Click any photo** for the full-screen viewer; use the arrow keys or swipe, and pinch to zoom on a phone.
 - **Browse the galleries** in the menu. The site opens straight into Surfing, but it can also open on a grid of all galleries.
 - **Visit the [About page](https://smugless.kuril.in/about)**, with a portrait, bio and contact link.
-- **Resize the window or open it on your phone.** Photos grow on big screens, and the site follows your light or dark mode.
+- **Resize the window or open it on your phone.** Photos grow on big screens.
 
 | [Full-screen viewer](https://smugless.kuril.in/landscapes) | [About page](https://smugless.kuril.in/about) |
 |---|---|
@@ -60,7 +60,27 @@ To try it with sample content first, seed it with Unsplash photos:
 SMUGLESS_URL=https://smugless.<your-subdomain>.workers.dev SMUGLESS_PASSWORD="$(cat .admin-password)" node scripts/seed.mjs
 ```
 
-**Custom domain:** if the domain's DNS is on Cloudflare, add a `routes` entry with `custom_domain: true` to `wrangler.jsonc`; Cloudflare's edge cache then also serves images and pages without invoking the Worker. If the DNS is elsewhere, see how the demo does it below.
+For a site-specific deployment, copy `wrangler.jsonc` to the ignored `wrangler.local.jsonc`. Use `env.demo` as an example and add an environment with your Worker name and R2 bucket. Run `npm run deploy -- --config wrangler.local.jsonc --env <site>`.
+
+**Custom domain:** If the domain's DNS is on Cloudflare, add a `routes` entry with `custom_domain: true` to your Worker config. If the DNS is elsewhere, see the demo setup below.
+
+### Google sign-in for admins
+
+Choose `ADMIN_AUTH` per Worker. `password` is the default and uses the `ADMIN_PASSWORD` secret. `google` signs in with a Gmail or Google Workspace account that you select.
+
+1. Create a [Web application OAuth client](https://developers.google.com/identity/openid-connect/openid-connect) in Google Cloud. Add `https://your-site.example/auth/google/callback` as an authorized redirect URI for each hostname you use. Leave authorized JavaScript origins blank.
+2. Store the client secret as the `GOOGLE_CLIENT_SECRET` Worker secret. For a named local environment, run `npx wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.local.jsonc --env <site>`.
+3. Add these `vars` to your site's environment in `wrangler.local.jsonc`, then deploy it.
+
+   ```json
+   "vars": {
+     "ADMIN_AUTH": "google",
+     "GOOGLE_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
+     "GOOGLE_ADMIN_EMAIL": "admin@example.com"
+   }
+   ```
+
+Open `/login` to start Google sign-in. Gallery pages stay public.
 
 ## How it works
 
@@ -75,7 +95,7 @@ R2 bucket smugless-photos (private)
 - `GET /img/<id>/<width>.<avif|webp|jpg>` serves `derived/` if present; otherwise it resizes the original with the Images binding, saves it to `derived/`, and serves it. Widths are fixed at 400/800/1200/1600/2400, so each photo produces at most 15 transformations.
 - Pages render on each request from `manifest.json`, so changes are live immediately.
 - The admin page holds the manifest in memory and PUTs the whole thing back. The server validates it (unique, non-reserved URLs; every photo used once).
-- Signing in sets a 30-day session cookie signed with the admin password, so changing the password signs everyone out. Scripts can skip the login page by sending the password via HTTP Basic auth (any username), as `scripts/seed.mjs` does.
+- Signing in sets a signed 30-day session cookie. In password mode, changing the password signs everyone out. Scripts in password mode can use HTTP Basic auth (any username), as `scripts/seed.mjs` does.
 
 Code: `src/index.ts` (routes), `src/images.ts`, `src/icon.ts`, `src/manifest.ts`, `src/views.ts`, `src/auth.ts`; browser code in `public/static/`.
 

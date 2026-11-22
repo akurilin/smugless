@@ -6,16 +6,8 @@
   --tile: #e9e6df;
   --gap: 6px;
   --pad: clamp(16px, 4vw, 48px);
-  color-scheme: light dark;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111110;
-    --fg: #ecebe7;
-    --muted: #8d8a82;
-    --line: #262624;
-    --tile: #1c1c1a;
-  }
+  /* Keep public pages light when the device uses dark mode. */
+  color-scheme: only light;
 }
 
 * { box-sizing: border-box; }
@@ -47,6 +39,15 @@ main { flex: 1; padding: 0 var(--pad) 48px; }
   text-transform: uppercase;
   text-decoration: none;
   white-space: nowrap;
+}
+/* Keep the full logo within the header and leave room for navigation. */
+.site-title--logo { align-self: center; max-width: min(180px, 40vw); }
+.site-title--logo img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 32px;
 }
 .site-nav {
   display: flex;

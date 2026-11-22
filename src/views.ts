@@ -5,6 +5,7 @@ import { iconLinks } from "./icon";
 import { displaySize, imageUrl, srcset } from "./images";
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
+const HEADER_LOGO_SOURCE_WIDTH = 400;
 
 function coverOf(g: Gallery): Photo | undefined {
   return g.photos.find((p) => p.id === g.cover) ?? g.photos[0];
@@ -25,6 +26,7 @@ function layout(
   m: Manifest,
   opts: { title: string; description?: string; ogImage?: string; current?: string; body: Html },
 ): Html {
+  const logo = m.site.logo;
   return html`<!doctype html>
 <html lang="en">
 <head>
@@ -39,7 +41,9 @@ ${iconHead(m)}
 </head>
 <body>
 <header class="site-header">
-  <a class="site-title" href="/">${m.site.title}</a>
+  <a class="site-title${logo ? " site-title--logo" : ""}" href="/">${logo
+    ? html`<img src="${imageUrl(logo.id, HEADER_LOGO_SOURCE_WIDTH, "webp")}" width="${logo.w}" height="${logo.h}" alt="${m.site.title}">`
+    : m.site.title}</a>
   <nav class="site-nav">
     ${listedGalleries(m).map(
       (g) =>

@@ -272,14 +272,19 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .portrait-drop { max-width: 320px; }
 .portrait-drop img { display: block; width: 100%; height: auto; margin-bottom: 8px; border-radius: 4px; }
 
-/* Site icon field */
-.icon-field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
-.icon-drop {
-  grid-auto-flow: column;
+/* Header logo and site icon uploads */
+.site-image-field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.site-image-drop {
   justify-content: start;
   gap: 10px;
   padding: 10px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   text-align: left;
 }
-.icon-drop img { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
-.icon-field .btn { justify-self: start; }
+.icon-field .site-image-drop { grid-auto-flow: column; }
+.icon-field img { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
+.logo-field .site-image-drop { justify-items: start; justify-content: stretch; }
+.logo-field img { max-width: 100%; max-height: 40px; object-fit: contain; }
+.site-image-field .btn { justify-self: start; }

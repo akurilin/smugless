@@ -1,8 +1,10 @@
 node_modules/
 .wrangler/
+/wrangler.local.jsonc
 .dev.vars
+.dev.vars.*
 .admin-password
-.demo-admin-password
+.*-admin-password
 .cloudflare-token
 .env
 .env.*

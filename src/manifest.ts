@@ -29,7 +29,8 @@ export interface About {
 export interface Manifest {
   // home: slug of a gallery to show at / instead of the grid of all galleries
   // icon: uploaded favicon (not part of any gallery); without it a letter icon is generated
-  site: { title: string; tagline?: string; home?: string; icon?: Photo };
+  // logo: uploaded header image; without it the header shows the site title
+  site: { title: string; tagline?: string; home?: string; icon?: Photo; logo?: Photo };
   galleries: Gallery[]; // navigation order
   about?: About;
 }
@@ -37,7 +38,11 @@ export interface Manifest {
 export interface Env {
   BUCKET: R2Bucket;
   IMAGES: ImagesBinding;
+  ADMIN_AUTH?: string;
   ADMIN_PASSWORD?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_ADMIN_EMAIL?: string;
 }
 
 const KEY = "manifest.json";
@@ -66,6 +71,7 @@ export function listedGalleries(m: Manifest): Gallery[] {
 export function findPhoto(m: Manifest, id: string): Photo | undefined {
   if (m.about?.photo?.id === id) return m.about.photo;
   if (m.site.icon?.id === id) return m.site.icon;
+  if (m.site.logo?.id === id) return m.site.logo;
   for (const g of m.galleries) {
     const p = g.photos.find((p) => p.id === id);
     if (p) return p;
@@ -110,12 +116,10 @@ export function validateManifest(input: unknown): Manifest | string {
     });
   }
 
-  let icon: Photo | undefined;
-  if (site.icon != null) {
-    const p = cleanPhoto(site.icon, ids);
-    if (typeof p === "string") return p;
-    icon = p;
-  }
+  const icon = site.icon == null ? undefined : cleanPhoto(site.icon, ids);
+  if (typeof icon === "string") return icon;
+  const logo = site.logo == null ? undefined : cleanPhoto(site.logo, ids);
+  if (typeof logo === "string") return logo;
 
   let about: About | undefined;
   if (obj.about != null) {
@@ -144,6 +148,7 @@ export function validateManifest(input: unknown): Manifest | string {
       // Only a listed gallery can replace the home page grid.
       ...(galleries.some((g) => g.slug === site.home && !g.hidden) ? { home: site.home } : {}),
       ...(icon ? { icon } : {}),
+      ...(logo ? { logo } : {}),
     },
     galleries,
     ...(about ? { about } : {}),
