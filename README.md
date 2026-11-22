@@ -92,7 +92,7 @@ R2 bucket smugless-photos (private)
   trash/<id>               originals of deleted photos
 ```
 
-- `GET /img/<id>/<width>.<avif|webp|jpg>` serves `derived/` if present; otherwise it resizes the original with the Images binding, saves it to `derived/`, and serves it. Widths are fixed at 400/800/1200/1600/2400, so each photo produces at most 15 transformations.
+- `GET /img/<id>/<width>.<avif|webp|jpg>` serves a cached copy from `derived/` or generates it with the Images binding. The request widths are 400, 800, 1200, 1600, and 2400 px. By default the public copy also fits within 1,600 px or 75% of the original on its longest side, whichever is smaller. The admin can turn this limit off.
 - Pages render on each request from `manifest.json`, so changes are live immediately.
 - The admin page holds the manifest in memory and PUTs the whole thing back. The server validates it (unique, non-reserved URLs; every photo used once).
 - Signing in sets a signed 30-day session cookie. In password mode, changing the password signs everyone out. Scripts in password mode can use HTTP Basic auth (any username), as `scripts/seed.mjs` does.
@@ -131,7 +131,7 @@ smugless is designed around Cloudflare's free tiers:
 | Images | 5,000 unique transformations/month | Resizing each photo, once |
 
 Why it stays inside them:
-- **Each photo is resized once.** Resized copies are saved back to R2 and served from there forever after, and every photo uses at most 15 sizes (5 widths × 3 formats). 100 photos cost at most ~1,500 transformations, one time.
+- **Each copy is generated on demand.** Resized copies stay in R2 for reuse. The five request widths and three formats limit the number of copies. Changing the public size limit can generate additional copies.
 - **No egress fees.** R2 doesn't charge for bandwidth, so a popular gallery doesn't run up a bill.
 - **No always-on server.** The Worker runs only when someone visits.
 

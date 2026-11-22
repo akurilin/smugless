@@ -146,8 +146,8 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .grow { flex: 1 1 240px; }
 .slug-input { display: flex; align-items: center; gap: 2px; color: var(--muted); }
 .field-error { color: var(--danger); font-size: 12px; min-height: 1em; }
-.gallery-visibility { display: flex; align-items: center; gap: 6px; justify-self: start; }
-.gallery-visibility input { width: auto; margin: 0; accent-color: var(--accent); }
+.checkbox-row { display: flex; align-items: center; gap: 6px; justify-self: start; }
+.checkbox-row input { width: auto; margin: 0; accent-color: var(--accent); }
 
 .dropzone {
   display: grid;

@@ -30,7 +30,7 @@ export interface Manifest {
   // home: slug of a gallery to show at / instead of the grid of all galleries
   // icon: uploaded favicon (not part of any gallery); without it a letter icon is generated
   // logo: uploaded header image; without it the header shows the site title
-  site: { title: string; tagline?: string; home?: string; icon?: Photo; logo?: Photo };
+  site: { title: string; tagline?: string; home?: string; icon?: Photo; logo?: Photo; limitPublicImages?: boolean };
   galleries: Gallery[]; // navigation order
   about?: About;
 }
@@ -147,6 +147,7 @@ export function validateManifest(input: unknown): Manifest | string {
       ...(typeof site.tagline === "string" && site.tagline.trim() ? { tagline: site.tagline } : {}),
       // Only a listed gallery can replace the home page grid.
       ...(galleries.some((g) => g.slug === site.home && !g.hidden) ? { home: site.home } : {}),
+      ...(typeof site.limitPublicImages === "boolean" ? { limitPublicImages: site.limitPublicImages } : {}),
       ...(icon ? { icon } : {}),
       ...(logo ? { logo } : {}),
     },

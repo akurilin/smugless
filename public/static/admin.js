@@ -17,7 +17,7 @@ const PHOTO_DELETE_CLASS = "photo-delete";
 const usdFormat = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const gbFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const MIN_DISPLAY_GB = 0.01;
-const thumb = (id, w = 400) => `/img/${id}/${w}.webp`;
+const thumb = (id, w = 400) => `/api/photos/${id}/${w}.webp`;
 
 // ---------- Tiny DOM helper ----------
 
@@ -339,6 +339,29 @@ function renderSidebar() {
         }),
       ),
       homePicker(),
+      h(
+        "div",
+        {},
+        h(
+          "label",
+          { class: "checkbox-row" },
+          h("input", {
+            type: "checkbox",
+            checked: manifest.site.limitPublicImages !== false,
+            "aria-describedby": "public-photo-size-help",
+            onchange: (e) => {
+              manifest.site.limitPublicImages = e.target.checked;
+              scheduleSave();
+            },
+          }),
+          "Limit public photo size",
+        ),
+        h(
+          "div",
+          { class: "muted hint", id: "public-photo-size-help" },
+          "Caps the longest side at 1,600 px or 75% of the original, whichever is smaller.",
+        ),
+      ),
       siteImagePicker("logo", {
         label: "Header logo",
         preview: (logo) => logo && thumb(logo.id),
@@ -612,7 +635,7 @@ function renderContent() {
     ),
     h(
       "label",
-      { class: "gallery-visibility" },
+      { class: "checkbox-row" },
       h("input", {
         type: "checkbox",
         checked: g.hidden === true,

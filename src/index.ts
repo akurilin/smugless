@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { googleCallback, login, logout, passwordLogin, requireAdmin } from "./auth";
 import { GOOGLE_CALLBACK_PATH } from "./google-auth";
 import { defaultIconResponse, uploadedIconResponse } from "./icon";
-import { serveImage, WIDTHS, type Format } from "./images";
+import { IMAGE_VARIANT_PARAM, LIMITED_IMAGE_VARIANT, parseImageRequest, publicImageEdge, resizeBounds, serveImage } from "./images";
 import { findPhoto, listedGalleries, loadManifest, PHOTO_ID, saveManifest, validateManifest, type Env } from "./manifest";
 import { aboutPage, adminPage, galleryPage, homePage, notFoundPage } from "./views";
 
@@ -10,6 +10,8 @@ const app = new Hono<{ Bindings: Env }>();
 
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 const PAGE_CACHE = "public, max-age=60";
+const LIMITED_IMAGE_CACHE = "public, max-age=31536000, immutable";
+const PUBLIC_IMAGE_CACHE = "public, no-cache";
 const BYTES_PER_GB = 1_000_000_000;
 const R2_FREE_GB_MONTH = 10;
 const R2_USD_PER_GB_MONTH = 0.015;
@@ -17,12 +19,19 @@ const R2_USD_PER_GB_MONTH = 0.015;
 // ---------- Images ----------
 
 app.get("/img/:id/:file", async (c) => {
-  const id = c.req.param("id");
-  const m = /^(\d+)\.(avif|webp|jpg)$/.exec(c.req.param("file"));
-  if (!PHOTO_ID.test(id) || !m) return c.notFound();
-  const width = Number(m[1]);
-  if (!(WIDTHS as readonly number[]).includes(width)) return c.notFound();
-  return serveImage(c.env, c.executionCtx, id, width, m[2] as Format);
+  const image = parseImageRequest(c.req.param("id"), c.req.param("file"));
+  if (!image) return c.notFound();
+  const { id, width, format } = image;
+  const manifest = await loadManifest(c.env.BUCKET);
+  const photo = findPhoto(manifest, id);
+  if (!photo) return c.notFound();
+
+  // Only URLs that always enforce the limit can be cached without revalidation.
+  const alwaysLimited = c.req.query(IMAGE_VARIANT_PARAM) === LIMITED_IMAGE_VARIANT;
+  const branding = id === manifest.site.logo?.id || id === manifest.site.icon?.id;
+  const limit = publicImageEdge(photo, alwaysLimited || (!branding && manifest.site.limitPublicImages !== false));
+  const cache = alwaysLimited ? LIMITED_IMAGE_CACHE : PUBLIC_IMAGE_CACHE;
+  return serveImage(c.env, c.executionCtx, id, resizeBounds(photo, width, limit), format, cache);
 });
 
 // ---------- Site icon ----------
@@ -91,6 +100,13 @@ app.put("/api/manifest", async (c) => {
   if (typeof result === "string") return c.json({ error: result }, 422);
   await saveManifest(c.env.BUCKET, result);
   return c.json(result);
+});
+
+// The admin can preview a new upload before it is saved in the manifest.
+app.get("/api/photos/:id/:file", (c) => {
+  const image = parseImageRequest(c.req.param("id"), c.req.param("file"));
+  if (!image) return c.notFound();
+  return serveImage(c.env, c.executionCtx, image.id, { width: image.width }, image.format, "private, no-store");
 });
 
 // Upload one original. Body is the raw file; name travels in X-Filename.

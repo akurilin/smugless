@@ -2,7 +2,7 @@ import { html } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { listedGalleries, type About, type Gallery, type Manifest, type Photo } from "./manifest";
 import { iconLinks } from "./icon";
-import { displaySize, imageUrl, srcset } from "./images";
+import { displaySize, imageUrl, publicImageEdge, srcset } from "./images";
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
 const HEADER_LOGO_SOURCE_WIDTH = 400;
@@ -61,16 +61,18 @@ ${iconHead(m)}
 }
 
 export function homePage(m: Manifest, origin: string): Html {
+  const limited = m.site.limitPublicImages !== false;
   const galleries = listedGalleries(m);
   const first = galleries.map(coverOf).find(Boolean);
   const cards = galleries.map((g) => {
     const cover = coverOf(g);
+    const edge = cover && publicImageEdge(cover, limited);
     return html`<a class="card" href="/${g.slug}">
       <div class="card-image">
         ${cover
           ? html`<picture>
-              <source type="image/avif" srcset="${srcset(cover, "avif")}" sizes="(max-width: 640px) 100vw, 33vw">
-              <img src="${imageUrl(cover.id, 800, "webp")}" srcset="${srcset(cover, "webp")}"
+              <source type="image/avif" srcset="${srcset(cover, "avif", edge)}" sizes="(max-width: 640px) 100vw, 33vw">
+              <img src="${imageUrl(cover.id, 800, "webp", edge)}" srcset="${srcset(cover, "webp", edge)}"
                    sizes="(max-width: 640px) 100vw, 33vw" alt="" decoding="async">
             </picture>`
           : ""}
@@ -83,7 +85,7 @@ export function homePage(m: Manifest, origin: string): Html {
   return layout(m, {
     title: m.site.title,
     description: m.site.tagline,
-    ogImage: first ? origin + imageUrl(first.id, 1200, "jpg") : undefined,
+    ogImage: first ? origin + imageUrl(first.id, 1200, "jpg", publicImageEdge(first, limited)) : undefined,
     body: html`
       ${m.site.tagline ? html`<p class="tagline">${m.site.tagline}</p>` : ""}
       ${galleries.length
@@ -94,20 +96,22 @@ export function homePage(m: Manifest, origin: string): Html {
 }
 
 export function galleryPage(m: Manifest, g: Gallery, origin: string, opts: { isHome?: boolean } = {}): Html {
+  const limited = m.site.limitPublicImages !== false;
   const cover = coverOf(g);
   const tiles = g.photos.map((p, i) => {
     const ratio = +(p.w / p.h).toFixed(4);
-    const full = displaySize(p, 2400);
+    const edge = publicImageEdge(p, limited);
+    const full = displaySize(p, 2400, edge);
     // Rough rendered width in a justified row; matches --row in site.css (rows also stretch a little to fill).
     const sizes = `(max-width: 640px) ${Math.min(100, Math.round(ratio * 65))}vw, (max-width: 1100px) ${Math.round(ratio * 380)}px, ${Math.round(ratio * 32)}vw`;
     const eager = i < 4;
-    return html`<a class="tile" style="--r:${ratio}" href="${imageUrl(p.id, 2400, "webp")}"
+    return html`<a class="tile" style="--r:${ratio}" href="${imageUrl(p.id, 2400, "webp", edge)}"
         data-pswp-width="${full.w}" data-pswp-height="${full.h}"
-        data-pswp-srcset="${srcset(p, "webp")}"
+        data-pswp-srcset="${srcset(p, "webp", edge)}"
         ${p.caption ? html`data-caption="${p.caption}"` : ""}>
       <picture>
-        <source type="image/avif" srcset="${srcset(p, "avif")}" sizes="${sizes}">
-        <img src="${imageUrl(p.id, 800, "webp")}" srcset="${srcset(p, "webp")}" sizes="${sizes}"
+        <source type="image/avif" srcset="${srcset(p, "avif", edge)}" sizes="${sizes}">
+        <img src="${imageUrl(p.id, 800, "webp", edge)}" srcset="${srcset(p, "webp", edge)}" sizes="${sizes}"
              width="${p.w}" height="${p.h}" alt="${p.caption ?? ""}"
              loading="${eager ? "eager" : "lazy"}" decoding="async"${i === 0 ? html` fetchpriority="high"` : ""}>
       </picture>
@@ -117,7 +121,7 @@ export function galleryPage(m: Manifest, g: Gallery, origin: string, opts: { isH
   return layout(m, {
     title: opts.isHome ? m.site.title : `${g.title} · ${m.site.title}`,
     description: (opts.isHome ? m.site.tagline : undefined) ?? g.description?.slice(0, 200),
-    ogImage: cover ? origin + imageUrl(cover.id, 1200, "jpg") : undefined,
+    ogImage: cover ? origin + imageUrl(cover.id, 1200, "jpg", publicImageEdge(cover, limited)) : undefined,
     current: g.slug,
     body: html`
       <h1 class="visually-hidden">${g.title}</h1>
@@ -129,18 +133,19 @@ export function galleryPage(m: Manifest, g: Gallery, origin: string, opts: { isH
 
 export function aboutPage(m: Manifest, about: About, origin: string): Html {
   const p = about.photo;
+  const edge = p && publicImageEdge(p, m.site.limitPublicImages !== false);
   const sizes = "(max-width: 760px) 100vw, 420px";
   return layout(m, {
     title: `${about.title} · ${m.site.title}`,
     description: about.text.split(/\n\s*\n/)[0]?.slice(0, 200),
-    ogImage: p ? origin + imageUrl(p.id, 1200, "jpg") : undefined,
+    ogImage: p ? origin + imageUrl(p.id, 1200, "jpg", edge) : undefined,
     current: "about",
     body: html`
       <article class="about${p ? "" : " no-photo"}">
         ${p
           ? html`<picture class="about-photo">
-              <source type="image/avif" srcset="${srcset(p, "avif")}" sizes="${sizes}">
-              <img src="${imageUrl(p.id, 800, "webp")}" srcset="${srcset(p, "webp")}" sizes="${sizes}"
+              <source type="image/avif" srcset="${srcset(p, "avif", edge)}" sizes="${sizes}">
+              <img src="${imageUrl(p.id, 800, "webp", edge)}" srcset="${srcset(p, "webp", edge)}" sizes="${sizes}"
                    width="${p.w}" height="${p.h}" alt="${p.caption ?? ""}" fetchpriority="high" decoding="async">
             </picture>`
           : ""}
