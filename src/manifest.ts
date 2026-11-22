@@ -13,6 +13,7 @@ export interface Gallery {
   slug: string; // becomes the route: /<slug>
   title: string;
   description?: string;
+  hidden?: boolean; // hide from public lists while keeping the gallery URL
   cover?: string; // photo id; defaults to the first photo
   photos: Photo[]; // display order
 }
@@ -58,6 +59,10 @@ export async function saveManifest(bucket: R2Bucket, m: Manifest): Promise<void>
   });
 }
 
+export function listedGalleries(m: Manifest): Gallery[] {
+  return m.galleries.filter((g) => !g.hidden);
+}
+
 export function findPhoto(m: Manifest, id: string): Photo | undefined {
   if (m.about?.photo?.id === id) return m.about.photo;
   if (m.site.icon?.id === id) return m.site.icon;
@@ -99,6 +104,7 @@ export function validateManifest(input: unknown): Manifest | string {
       slug: g.slug,
       title: g.title.trim(),
       ...(typeof g.description === "string" && g.description.trim() ? { description: g.description } : {}),
+      ...(g.hidden === true ? { hidden: true } : {}),
       ...(typeof g.cover === "string" && photos.some((p) => p.id === g.cover) ? { cover: g.cover } : {}),
       photos,
     });
@@ -135,8 +141,8 @@ export function validateManifest(input: unknown): Manifest | string {
     site: {
       title: site.title.trim(),
       ...(typeof site.tagline === "string" && site.tagline.trim() ? { tagline: site.tagline } : {}),
-      // Dropped if it no longer names a gallery (renamed or deleted), like a stale cover.
-      ...(typeof site.home === "string" && slugs.has(site.home) ? { home: site.home } : {}),
+      // Only a listed gallery can replace the home page grid.
+      ...(galleries.some((g) => g.slug === site.home && !g.hidden) ? { home: site.home } : {}),
       ...(icon ? { icon } : {}),
     },
     galleries,

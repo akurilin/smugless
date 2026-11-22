@@ -1,6 +1,6 @@
 import { html } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { About, Gallery, Manifest, Photo } from "./manifest";
+import { listedGalleries, type About, type Gallery, type Manifest, type Photo } from "./manifest";
 import { iconLinks } from "./icon";
 import { displaySize, imageUrl, srcset } from "./images";
 
@@ -41,7 +41,7 @@ ${iconHead(m)}
 <header class="site-header">
   <a class="site-title" href="/">${m.site.title}</a>
   <nav class="site-nav">
-    ${m.galleries.map(
+    ${listedGalleries(m).map(
       (g) =>
         html`<a href="/${g.slug}"${opts.current === g.slug ? html` aria-current="page"` : ""}>${g.title}</a>`,
     )}
@@ -57,8 +57,9 @@ ${iconHead(m)}
 }
 
 export function homePage(m: Manifest, origin: string): Html {
-  const first = m.galleries.map(coverOf).find(Boolean);
-  const cards = m.galleries.map((g) => {
+  const galleries = listedGalleries(m);
+  const first = galleries.map(coverOf).find(Boolean);
+  const cards = galleries.map((g) => {
     const cover = coverOf(g);
     return html`<a class="card" href="/${g.slug}">
       <div class="card-image">
@@ -81,7 +82,7 @@ export function homePage(m: Manifest, origin: string): Html {
     ogImage: first ? origin + imageUrl(first.id, 1200, "jpg") : undefined,
     body: html`
       ${m.site.tagline ? html`<p class="tagline">${m.site.tagline}</p>` : ""}
-      ${m.galleries.length
+      ${galleries.length
         ? html`<div class="cards">${cards}</div>`
         : html`<p class="empty">Nothing here yet.</p>`}
     `,

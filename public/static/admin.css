@@ -135,6 +135,8 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .grow { flex: 1 1 240px; }
 .slug-input { display: flex; align-items: center; gap: 2px; color: var(--muted); }
 .field-error { color: var(--danger); font-size: 12px; min-height: 1em; }
+.gallery-visibility { display: flex; align-items: center; gap: 6px; justify-self: start; }
+.gallery-visibility input { width: auto; margin: 0; accent-color: var(--accent); }
 
 .dropzone {
   display: grid;
@@ -204,6 +206,24 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.photo-delete {
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  right: 6px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px 8px;
+  line-height: 1;
+}
+.photo-delete [role="img"] { font-size: 22px; }
+/* Keep the button visible on touch screens and during confirmation. */
+@media (hover: hover) and (pointer: fine) {
+  .photo-grid li:not(:hover) .photo-delete:not(:focus-visible):not(.armed) {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 #photo-panel {

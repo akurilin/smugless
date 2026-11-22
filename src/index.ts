@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { checkPassword, endSession, requireAdmin, startSession } from "./auth";
 import { defaultIconResponse, uploadedIconResponse } from "./icon";
 import { serveImage, WIDTHS, type Format } from "./images";
-import { findPhoto, loadManifest, PHOTO_ID, saveManifest, validateManifest, type Env } from "./manifest";
+import { findPhoto, listedGalleries, loadManifest, PHOTO_ID, saveManifest, validateManifest, type Env } from "./manifest";
 import { aboutPage, adminPage, galleryPage, homePage, loginPage, notFoundPage } from "./views";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -128,8 +128,8 @@ app.delete("/api/photos/:id", async (c) => {
 app.get("/", async (c) => {
   const m = await loadManifest(c.env.BUCKET);
   const origin = new URL(c.req.url).origin;
-  // The landing page is either the grid of all galleries or one chosen gallery.
-  const home = m.site.home ? m.galleries.find((g) => g.slug === m.site.home) : undefined;
+  // Fall back to the grid if the chosen home gallery is hidden or missing.
+  const home = m.site.home ? listedGalleries(m).find((g) => g.slug === m.site.home) : undefined;
   const page = home ? galleryPage(m, home, origin, { isHome: true }) : homePage(m, origin);
   return c.html(page, 200, { "Cache-Control": PAGE_CACHE });
 });

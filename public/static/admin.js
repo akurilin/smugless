@@ -11,6 +11,8 @@ let saving = Promise.resolve();
 
 const MAX_BYTES = 100 * 1024 * 1024; // Workers request body limit
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+const CONFIRM_TIMEOUT_MS = 4000;
+const PHOTO_DELETE_CLASS = "photo-delete";
 const thumb = (id, w = 400) => `/img/${id}/${w}.webp`;
 
 // ---------- Tiny DOM helper ----------
@@ -117,9 +119,9 @@ function confirmButton(label, armedLabel, onConfirm) {
           btn.classList.add("armed");
           timer = setTimeout(() => {
             timer = null;
-            btn.textContent = label;
+            btn.replaceChildren(label);
             btn.classList.remove("armed");
-          }, 4000);
+          }, CONFIRM_TIMEOUT_MS);
           return;
         }
         clearTimeout(timer);
@@ -365,7 +367,7 @@ function renderSidebar() {
   );
 }
 
-// What visitors see at /: the grid of all galleries, or one gallery.
+// The home page can show the gallery grid or one listed gallery.
 function homePicker() {
   return h(
     "label",
@@ -380,8 +382,10 @@ function homePicker() {
           scheduleSave();
         },
       },
-      h("option", { value: "" }, "All galleries (grid)"),
-      manifest.galleries.map((g) => h("option", { value: g.slug, selected: manifest.site.home === g.slug }, g.title)),
+      h("option", { value: "" }, "Gallery grid"),
+      manifest.galleries
+        .filter((g) => !g.hidden)
+        .map((g) => h("option", { value: g.slug, selected: manifest.site.home === g.slug }, g.title)),
     ),
   );
 }
@@ -403,9 +407,10 @@ function iconPicker() {
       const { id } = await uploadFile(file, (p) => (msg.textContent = `Uploading… ${Math.round(p * 100)}%`));
       const old = manifest.site.icon;
       manifest.site.icon = { id, w, h: height, filename: file.name };
-      renderSidebar();
+      // The preview route reads the saved icon from the manifest.
       if (old) await deletePhotos([old.id]);
       else await saveNow();
+      renderSidebar();
     } catch (err) {
       msg.textContent = err.message;
     }
@@ -537,6 +542,22 @@ function renderContent() {
       }),
     ),
     h(
+      "label",
+      { class: "gallery-visibility" },
+      h("input", {
+        type: "checkbox",
+        checked: g.hidden === true,
+        onchange: (e) => {
+          g.hidden = e.target.checked;
+          // Return to the grid if the home page used this gallery.
+          if (g.hidden && manifest.site.home === g.slug) delete manifest.site.home;
+          renderSidebar();
+          scheduleSave();
+        },
+      }),
+      "Hide from public lists",
+    ),
+    h(
       "div",
       { class: "row end" },
       confirmButton(
@@ -609,8 +630,23 @@ function renderPhotos() {
   const grid = h(
     "ul",
     { class: "photo-grid" },
-    g.photos.map((p) =>
-      h(
+    g.photos.map((p) => {
+      const remove = confirmButton(
+        h("span", { role: "img", "aria-label": `Delete ${p.filename}` }, "×"),
+        "Confirm delete",
+        async () => {
+          g.photos = g.photos.filter((x) => x !== p);
+          if (g.cover === p.id) delete g.cover;
+          if (selectedPhotoId === p.id) selectedPhotoId = null;
+          renderSidebar();
+          renderPhotos();
+          await deletePhotos([p.id]);
+        },
+      );
+      remove.classList.add(PHOTO_DELETE_CLASS);
+      remove.addEventListener("click", (e) => e.stopPropagation());
+
+      return h(
         "li",
         {
           class: [p.id === selectedPhotoId && "selected", p.id === (g.cover ?? g.photos[0]?.id) && "cover"]
@@ -625,12 +661,16 @@ function renderPhotos() {
         },
         h("img", { src: thumb(p.id), alt: p.filename, loading: "lazy", draggable: "false" }),
         p.caption ? h("span", { class: "cap" }, p.caption) : null,
-      ),
-    ),
+        remove,
+      );
+    }),
   );
 
   Sortable.create(grid, {
     animation: 150,
+    // Let the delete button receive focus without starting a drag.
+    filter: `.${PHOTO_DELETE_CLASS}`,
+    preventOnFilter: false,
     onEnd: (e) => {
       const [moved] = g.photos.splice(e.oldIndex, 1);
       g.photos.splice(e.newIndex, 0, moved);
@@ -664,7 +704,7 @@ function renderPanel() {
   const isCover = (g.cover ?? g.photos[0]?.id) === p.id;
   const others = manifest.galleries.filter((x) => x !== g);
 
-  panel.replaceChildren(
+  const fields = [
     h("img", { src: thumb(p.id, 800), alt: p.filename }),
     h("p", { class: "meta" }, p.filename, h("br"), `${p.w} × ${p.h}`),
     h(
@@ -722,15 +762,9 @@ function renderPanel() {
           ),
         )
       : null,
-    confirmButton("Delete photo", "Click again to delete", async () => {
-      g.photos = g.photos.filter((x) => x !== p);
-      if (g.cover === p.id) delete g.cover;
-      selectedPhotoId = null;
-      renderSidebar();
-      renderPhotos();
-      await deletePhotos([p.id]);
-    }),
-  );
+  ];
+  // Skip the missing move field so the browser does not show "null".
+  panel.replaceChildren(...fields.filter(Boolean));
 }
 
 // ---------- About page ----------
