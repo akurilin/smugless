@@ -39,6 +39,8 @@ Open `/login` at the URL Wrangler prints. Sign in with the password in `.admin-p
 
 Password checks are limited to 10 a minute per IP address, through the `LOGIN_LIMITER` rate-limit binding in `wrangler.jsonc`. Without that binding there is no limit.
 
+Scripts can also authenticate with HTTP Basic auth on `/api/*`. If yours sign in with the form instead, as `scripts/seed.mjs` does, set the `ADMIN_BASIC_AUTH` var to `off`. Then the password is only sent at sign-in.
+
 <details>
 <summary>Sample photos and custom domains</summary>
 

@@ -2,7 +2,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { finishGoogleLogin, googleConfig, startGoogleLogin } from "./google-auth";
 import type { Env } from "./manifest";
-import { allowAuthAttempt } from "./security";
+import { allowAuthAttempt, basicAuthEnabled } from "./security";
 import { loginPage } from "./views";
 
 // Admin access: a login form sets a signed session cookie. Scripts can instead
@@ -122,7 +122,7 @@ async function validSession(password: string, value?: string): Promise<boolean> 
 
 async function validBasic(password: string, c: C): Promise<"ok" | "denied" | "limited"> {
   const header = c.req.header("Authorization") ?? "";
-  if (!header.startsWith("Basic ")) return "denied";
+  if (!header.startsWith("Basic ") || !basicAuthEnabled(c.env)) return "denied";
   // Every Basic request is a password check, so each one counts toward the limit.
   if (!await allowAuthAttempt(c)) return "limited";
   try {

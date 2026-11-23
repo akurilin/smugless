@@ -90,3 +90,8 @@ export async function allowAuthAttempt(c: C): Promise<boolean> {
     return true; // fail open: a limiter outage shouldn't lock the owner out
   }
 }
+
+/** HTTP Basic auth for scripts is on unless ADMIN_BASIC_AUTH is "off". */
+export function basicAuthEnabled(env: Env): boolean {
+  return env.ADMIN_BASIC_AUTH !== "off";
+}

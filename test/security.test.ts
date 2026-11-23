@@ -107,6 +107,11 @@ describe("HTTP Basic auth", () => {
     expect((await req("/api/manifest", { headers: basic() })).status).toBe(200);
   });
 
+  it("can be turned off with ADMIN_BASIC_AUTH=off", async () => {
+    const env = makeEnv({ ADMIN_BASIC_AUTH: "off" });
+    expect((await req("/api/manifest", { headers: basic() }, env)).status).toBe(401);
+  });
+
   it("counts every attempt toward the rate limit", async () => {
     const env = makeEnv({ LOGIN_LIMITER: limiter(1) });
     expect((await req("/api/manifest", { headers: basic("nope") }, env)).status).toBe(401);
