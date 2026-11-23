@@ -4,6 +4,8 @@ import type { Env } from "./manifest";
 // Defense-in-depth hardening that wraps the app: security headers, a check
 // against cross-origin writes, sign-in rate limiting and request size limits.
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 // Every script and stylesheet is a same-origin file. The one inline style is the
 // `style="--r:…"` aspect ratio on gallery tiles, hence style-src-attr.
 const CSP = [
@@ -54,3 +56,19 @@ function applyHeaders(headers: Headers, url: string) {
     for (const [k, v] of Object.entries(HTML_HEADERS)) if (!headers.has(k)) headers.set(k, v);
   }
 }
+
+/**
+ * Refuses state-changing requests that a browser sent from another site,
+ * including sibling subdomains, which SameSite=Lax cookies treat as same-site.
+ * Scripts (no Origin header) are unaffected and still need credentials.
+ */
+export const sameOriginWrites: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+  if (SAFE_METHODS.has(c.req.method)) return next();
+  const origin = c.req.header("Origin");
+  const fetchSite = c.req.header("Sec-Fetch-Site");
+  const crossOrigin = origin
+    ? origin !== new URL(c.req.url).origin
+    : fetchSite === "cross-site" || fetchSite === "same-site";
+  if (crossOrigin) return c.text("Cross-origin request refused", 403);
+  return next();
+};

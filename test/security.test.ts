@@ -16,6 +16,14 @@ function sessionCookie(res: Response): string {
   return (res.headers.get("Set-Cookie") ?? "").split(";")[0];
 }
 
+const manifest = {
+  site: { title: "My Photos" },
+  galleries: [
+    { slug: "dogs", title: "Dogs", photos: [] },
+    { slug: "smith-wedding", title: "Smith wedding", hidden: true, photos: [] },
+  ],
+};
+
 describe("security headers", () => {
   it("sends CSP and anti-framing headers on HTML pages", async () => {
     const res = await req("/", {});
@@ -31,6 +39,38 @@ describe("security headers", () => {
     const res = await req("/favicon.svg", {});
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(res.headers.get("Content-Security-Policy")).toBeNull();
+  });
+});
+
+describe("cross-origin writes", () => {
+  it("refuses a PUT from another origin even with valid credentials", async () => {
+    const res = await req("/api/manifest", {
+      method: "PUT",
+      headers: { ...basic(), Origin: "https://evil.example", "Content-Type": "application/json" },
+      body: JSON.stringify(manifest),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("refuses a sibling-subdomain request that has no Origin header", async () => {
+    const res = await req("/logout", { method: "POST", headers: { "Sec-Fetch-Site": "same-site" } });
+    expect(res.status).toBe(403);
+  });
+
+  it("allows same-origin browser writes and scripts without Origin", async () => {
+    const env = makeEnv();
+    const browser = await req("/api/manifest", {
+      method: "PUT",
+      headers: { ...basic(), Origin: ORIGIN, "Content-Type": "application/json" },
+      body: JSON.stringify(manifest),
+    }, env);
+    expect(browser.status).toBe(200);
+    const script = await req("/api/manifest", {
+      method: "PUT",
+      headers: { ...basic(), "Content-Type": "application/json" },
+      body: JSON.stringify(manifest),
+    }, env);
+    expect(script.status).toBe(200);
   });
 });
 
