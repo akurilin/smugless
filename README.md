@@ -1,6 +1,6 @@
 # smugless
 
-An open-source photography portfolio with a built-in admin panel. It runs on your Cloudflare account.
+An open-source, self-hosted photography portfolio with a built-in admin panel. Run it on your Cloudflare account for **$0 per month** within the free allowances.
 
 [Try the live demo](https://smugless.kuril.in)
 
@@ -94,6 +94,10 @@ npm run typecheck
 ### Demo deployment
 
 The demo uses `env.demo` in `wrangler.jsonc`, with a separate Worker, bucket, and password. The Pages project in `demo-proxy/` forwards its custom domain to the demo Worker through a service binding.
+
+GitHub Actions deploys the demo Worker on pushes to `main`. The `demo` environment uses the `CLOUDFLARE_ACCOUNT_ID` variable and the `CLOUDFLARE_DEMO_API_TOKEN` secret. Give the token Editor access to the `smugless-demo` Worker.
+
+Use these commands for manual maintenance.
 
 ```bash
 npm run deploy:demo
