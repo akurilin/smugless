@@ -89,6 +89,7 @@ npm run deploy                              # deploy
 npx wrangler secret put ADMIN_PASSWORD      # change the admin password
 npm run tail                                # live logs
 npm run typecheck
+npm test                                    # unit tests (vitest)
 ```
 
 ### Demo deployment
