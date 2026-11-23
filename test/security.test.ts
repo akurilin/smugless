@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import app from "../src/index";
+import { limitKey } from "../src/security";
 import { basic, ctx, limiter, makeEnv, ORIGIN, PASSWORD } from "./helpers";
 
 const req = (path: string, init: RequestInit, env = makeEnv()) => app.request(ORIGIN + path, init, env, ctx);
@@ -105,6 +106,16 @@ describe("password sign-in", () => {
   it("rejects a forged session cookie", async () => {
     const forged = `smugless_session=${Math.floor(Date.now() / 1000) + 3600}.AAAA`;
     expect((await req("/api/manifest", { headers: { Cookie: forged } })).status).toBe(401);
+  });
+});
+
+describe("rate-limit key", () => {
+  it("uses the whole IPv4 address and the /64 prefix of an IPv6 address", () => {
+    expect(limitKey("203.0.113.7")).toBe("203.0.113.7");
+    expect(limitKey("2001:db8:85a3:0:1:2:3:4")).toBe("2001:db8:85a3:0::/64");
+    expect(limitKey("2001:DB8:85a3::9")).toBe("2001:db8:85a3:0::/64");
+    expect(limitKey("2001:db8::")).toBe("2001:db8:0:0::/64");
+    expect(limitKey("::1")).toBe("0:0:0:0::/64");
   });
 });
 
