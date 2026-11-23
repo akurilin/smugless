@@ -124,3 +124,21 @@ describe("HTTP Basic auth", () => {
     expect((await req("/api/manifest", { headers: basic() }, env)).status).toBe(429);
   });
 });
+
+describe("hidden galleries", () => {
+  it("are served but marked noindex; listed galleries are not", async () => {
+    const env = makeEnv();
+    await env.BUCKET.put("manifest.json", JSON.stringify(manifest));
+    const hidden = await req("/smith-wedding", {}, env);
+    expect(hidden.status).toBe(200);
+    expect(hidden.headers.get("X-Robots-Tag")).toContain("noindex");
+    const listed = await req("/dogs", {}, env);
+    expect(listed.headers.get("X-Robots-Tag")).toBeNull();
+    expect(await (await req("/", {}, env)).text()).not.toContain("smith-wedding");
+  });
+
+  it("keeps the sign-in page and admin out of search engines", async () => {
+    expect((await req("/login", {})).headers.get("X-Robots-Tag")).toContain("noindex");
+    expect((await req("/admin", {})).headers.get("X-Robots-Tag")).toContain("noindex");
+  });
+});
