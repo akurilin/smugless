@@ -142,3 +142,38 @@ describe("hidden galleries", () => {
     expect((await req("/admin", {})).headers.get("X-Robots-Tag")).toContain("noindex");
   });
 });
+
+describe("uploads", () => {
+  const upload = (headers: Record<string, string>, body: BodyInit = new Uint8Array([0xff, 0xd8, 0xff])) =>
+    ({ method: "POST", headers: { ...basic(), "Content-Type": "image/jpeg", ...headers }, body });
+
+  it("refuses bodies declared over 100 MB", async () => {
+    const res = await req("/api/photos", upload({ "X-Filename": "a.jpg", "Content-Length": String(101 * 1024 * 1024) }));
+    expect(res.status).toBe(413);
+  });
+
+  it("refuses non-image types", async () => {
+    const res = await req("/api/photos", upload({ "X-Filename": "a.html", "Content-Length": "3", "Content-Type": "text/html" }));
+    expect(res.status).toBe(415);
+  });
+
+  it("stores a cleaned, length-capped filename", async () => {
+    const env = makeEnv();
+    const name = encodeURIComponent("bad\u0000\nname" + "x".repeat(400) + ".jpg");
+    const res = await req("/api/photos", upload({ "X-Filename": name, "Content-Length": "3" }), env);
+    expect(res.status).toBe(200);
+    const { id } = await res.json() as { id: string };
+    const stored = env.BUCKET.objects.get(`originals/${id}`)!;
+    expect(stored.customMetadata!.filename).toMatch(/^badnamex+$/);
+    expect(stored.customMetadata!.filename.length).toBe(255);
+  });
+
+  it("refuses an oversized manifest", async () => {
+    const res = await req("/api/manifest", {
+      method: "PUT",
+      headers: { ...basic(), "Content-Type": "application/json", "Content-Length": String(6 * 1024 * 1024) },
+      body: "{}",
+    });
+    expect(res.status).toBe(413);
+  });
+});
