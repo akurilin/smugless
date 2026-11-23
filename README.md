@@ -35,7 +35,7 @@ npm run deploy
 openssl rand -base64 18 | tr -d '\n' | tee .admin-password | npx wrangler secret put ADMIN_PASSWORD
 ```
 
-Open `/login` at the URL Wrangler prints. Sign in with the password in `.admin-password`.
+Open `/login` at the URL Wrangler prints. Sign in with the password in `.admin-password`. The admin needs a password of at least 12 characters. The `openssl` command above makes 24.
 
 Password checks are limited to 10 a minute per IP address, through the `LOGIN_LIMITER` rate-limit binding in `wrangler.jsonc`. Without that binding there is no limit.
 

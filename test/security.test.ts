@@ -96,6 +96,12 @@ describe("password sign-in", () => {
     expect((await signIn(env)).status).toBe(429);
   });
 
+  it("disables the admin when the password is too short", async () => {
+    const env = makeEnv({ ADMIN_PASSWORD: "short" });
+    expect((await signIn(env, "short")).status).toBe(503);
+    expect((await req("/api/manifest", { headers: basic("short") }, env)).status).toBe(503);
+  });
+
   it("rejects a forged session cookie", async () => {
     const forged = `smugless_session=${Math.floor(Date.now() / 1000) + 3600}.AAAA`;
     expect((await req("/api/manifest", { headers: { Cookie: forged } })).status).toBe(401);

@@ -6,6 +6,7 @@ import type { Env } from "./manifest";
 
 type C = Context<{ Bindings: Env }>;
 
+export const MIN_PASSWORD_LENGTH = 12;
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 // Every script and stylesheet is a same-origin file. The one inline style is the
@@ -94,4 +95,9 @@ export async function allowAuthAttempt(c: C): Promise<boolean> {
 /** HTTP Basic auth for scripts is on unless ADMIN_BASIC_AUTH is "off". */
 export function basicAuthEnabled(env: Env): boolean {
   return env.ADMIN_BASIC_AUTH !== "off";
+}
+
+/** Short passwords make online guessing practical, so the admin refuses them. */
+export function passwordTooShort(password: string): boolean {
+  return password.length < MIN_PASSWORD_LENGTH;
 }
