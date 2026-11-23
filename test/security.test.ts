@@ -16,6 +16,24 @@ function sessionCookie(res: Response): string {
   return (res.headers.get("Set-Cookie") ?? "").split(";")[0];
 }
 
+describe("security headers", () => {
+  it("sends CSP and anti-framing headers on HTML pages", async () => {
+    const res = await req("/", {});
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
+    expect(res.headers.get("Content-Security-Policy")).toContain("script-src 'self'");
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("Strict-Transport-Security")).toMatch(/max-age=\d+/);
+  });
+
+  it("sends nosniff but not CSP on non-HTML responses", async () => {
+    const res = await req("/favicon.svg", {});
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("Content-Security-Policy")).toBeNull();
+  });
+});
+
 describe("password sign-in", () => {
   it("signs in with the right password and the cookie opens the API", async () => {
     const env = makeEnv();
