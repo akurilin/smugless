@@ -52,4 +52,10 @@ export function basic(password = PASSWORD) {
   return { Authorization: "Basic " + btoa(`script:${password}`) };
 }
 
+/** A limiter that allows `n` attempts in total. */
+export function limiter(n: number) {
+  let used = 0;
+  return { limit: async () => ({ success: used++ < n }) } as RateLimit;
+}
+
 export const ctx = { waitUntil() {}, passThroughOnException() {}, props: {} } as unknown as ExecutionContext;

@@ -43,6 +43,7 @@ export interface Env {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_ADMIN_EMAIL?: string;
+  LOGIN_LIMITER?: RateLimit; // optional per-IP limit on sign-in attempts
 }
 
 const KEY = "manifest.json";

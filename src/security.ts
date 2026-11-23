@@ -1,8 +1,10 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { Env } from "./manifest";
 
 // Defense-in-depth hardening that wraps the app: security headers, a check
 // against cross-origin writes, sign-in rate limiting and request size limits.
+
+type C = Context<{ Bindings: Env }>;
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -72,3 +74,19 @@ export const sameOriginWrites: MiddlewareHandler<{ Bindings: Env }> = async (c, 
   if (crossOrigin) return c.text("Cross-origin request refused", 403);
   return next();
 };
+
+/**
+ * Counts one sign-in attempt against the per-IP limit. Every attempt counts, so
+ * the limit caps password guesses. Without the LOGIN_LIMITER binding there is no limit.
+ */
+export async function allowAuthAttempt(c: C): Promise<boolean> {
+  const limiter = c.env.LOGIN_LIMITER;
+  if (!limiter) return true;
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  try {
+    return (await limiter.limit({ key: `auth:${ip}` })).success;
+  } catch (err) {
+    console.error("rate limiter failed", err);
+    return true; // fail open: a limiter outage shouldn't lock the owner out
+  }
+}

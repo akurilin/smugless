@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import app from "../src/index";
-import { basic, ctx, makeEnv, ORIGIN, PASSWORD } from "./helpers";
+import { basic, ctx, limiter, makeEnv, ORIGIN, PASSWORD } from "./helpers";
 
 const req = (path: string, init: RequestInit, env = makeEnv()) => app.request(ORIGIN + path, init, env, ctx);
 
@@ -89,6 +89,13 @@ describe("password sign-in", () => {
     expect((await signIn(makeEnv(), "wrong")).status).toBe(401);
   });
 
+  it("stops checking passwords once the rate limit is hit, even the right one", async () => {
+    const env = makeEnv({ LOGIN_LIMITER: limiter(2) });
+    expect((await signIn(env, "guess-1")).status).toBe(401);
+    expect((await signIn(env, "guess-2")).status).toBe(401);
+    expect((await signIn(env)).status).toBe(429);
+  });
+
   it("rejects a forged session cookie", async () => {
     const forged = `smugless_session=${Math.floor(Date.now() / 1000) + 3600}.AAAA`;
     expect((await req("/api/manifest", { headers: { Cookie: forged } })).status).toBe(401);
@@ -98,5 +105,11 @@ describe("password sign-in", () => {
 describe("HTTP Basic auth", () => {
   it("works by default", async () => {
     expect((await req("/api/manifest", { headers: basic() })).status).toBe(200);
+  });
+
+  it("counts every attempt toward the rate limit", async () => {
+    const env = makeEnv({ LOGIN_LIMITER: limiter(1) });
+    expect((await req("/api/manifest", { headers: basic("nope") }, env)).status).toBe(401);
+    expect((await req("/api/manifest", { headers: basic() }, env)).status).toBe(429);
   });
 });

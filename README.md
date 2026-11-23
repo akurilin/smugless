@@ -37,6 +37,8 @@ openssl rand -base64 18 | tr -d '\n' | tee .admin-password | npx wrangler secret
 
 Open `/login` at the URL Wrangler prints. Sign in with the password in `.admin-password`.
 
+Password checks are limited to 10 a minute per IP address, through the `LOGIN_LIMITER` rate-limit binding in `wrangler.jsonc`. Without that binding there is no limit.
+
 <details>
 <summary>Sample photos and custom domains</summary>
 
