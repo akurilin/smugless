@@ -2,8 +2,6 @@
 
 An open-source, self-hosted photography portfolio with a built-in admin panel. Run it on your Cloudflare account for **$0 per month** within the free allowances.
 
-Smugless automatically resizes photos on demand with Cloudflare Images. The browser selects an AVIF or WebP copy at a size that fits the display.
-
 [Try the live demo](https://smugless.kuril.in)
 
 [![A surfing gallery on the Smugless demo](docs/gallery.jpg)](https://smugless.kuril.in)
