@@ -2,6 +2,8 @@
 
 An open-source, self-hosted photography portfolio with a built-in admin panel. Run it on your Cloudflare account for **$0 per month** within the free allowances.
 
+Smugless automatically resizes photos on demand with Cloudflare Images. The browser selects an AVIF or WebP copy at a size that fits the display.
+
 [Try the live demo](https://smugless.kuril.in)
 
 [![A surfing gallery on the Smugless demo](docs/gallery.jpg)](https://smugless.kuril.in)
@@ -75,7 +77,9 @@ Open `/login` to start Google sign-in.
 
 ## Storage and cost
 
-One Cloudflare Worker serves the site. Cloudflare Images creates responsive AVIF and WebP copies on demand. A private R2 bucket stores the site settings, originals, and resized copies. When you delete a photo, its original moves to trash and still uses storage. Keep a separate backup of your originals.
+One Cloudflare Worker serves the site. A private R2 bucket stores the site settings, originals, and resized copies for reuse. Smugless sets a one-year cache lifetime for image URLs that always enforce the public size limit.
+
+When you delete a photo, its original moves to trash and still uses storage. Keep a separate backup of your originals.
 
 The admin estimate covers storage. For current rates and allowances, see [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [R2 pricing](https://developers.cloudflare.com/r2/pricing/), and [Images pricing](https://developers.cloudflare.com/images/pricing/).
 
